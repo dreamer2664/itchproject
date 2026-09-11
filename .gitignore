@@ -1,0 +1,9 @@
+# never commit caches, keys, or local databases
+cache/
+data/
+build/
+bin/
+__pycache__/
+*.pyc
+.env
+secrets.json

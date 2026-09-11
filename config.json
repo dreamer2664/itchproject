@@ -1,0 +1,23 @@
+{
+  "itch": {
+    "username": "",
+    "api_key_env": "BUTLER_API_KEY",
+    "_comment": "Set your itch.io username here. The API key goes in the BUTLER_API_KEY environment variable, never in this file."
+  },
+  "tools": [
+    {
+      "slug": "dungeon-map-generator",
+      "title": "Delve \u2014 Procedural Dungeon Map Generator",
+      "tagline": "Infinite, shareable dungeons in one click. Deterministic seeds, four palettes, PNG and tile-grid export.",
+      "tags": ["dungeon-generator", "map-generator", "procedural-generation", "roguelike", "tools", "level-design", "ttrpg", "dnd"],
+      "kind": "html",
+      "classification": "tool",
+      "price_usd": 0,
+      "pay_what_you_want": false,
+      "launch_mode": "free",
+      "_launch_note": "launch_mode 'free' = strict No payments on itch.io, donations OFF. Required while no adult operates the account payout side: even pay-what-you-want or donations can receive money, and receiving money is what itch's processors restrict to 18+. Flip to 'pwyw' at 18 or once an adult handles payouts.",
+      "ai_disclosure": "none",
+      "_ai_note": "Deliberately contains no neural-network output: all geometry comes from a self-contained deterministic algorithm (seeded PRNG + rejection sampling + MST). Under itch.io's quality guidelines this does NOT require a generative-AI tag. Keep it that way."
+    }
+  ]
+}
