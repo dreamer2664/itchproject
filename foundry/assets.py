@@ -50,7 +50,7 @@ def _set_state(page, seed: str, style: str | None = None, labels: bool = True) -
                 st.value = style; st.dispatchEvent(new Event('change'));
             }
             const l = document.getElementById('optLabels');
-            if (l.checked !== labels) { l.checked = labels; l.dispatchEvent(new Event('change')); }
+            if (l && l.checked !== labels) { l.checked = labels; l.dispatchEvent(new Event('change')); }
         }""",
         [seed, style, labels],
     )

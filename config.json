@@ -23,6 +23,19 @@
       "_launch_note": "launch_mode 'free' = strict No payments on itch.io, donations OFF. Required while no adult operates the account payout side: even pay-what-you-want or donations can receive money, and receiving money is what itch's processors restrict to 18+. Flip to 'pwyw' at 18 or once an adult handles payouts.",
       "ai_disclosure": "none",
       "_ai_note": "Deliberately contains no neural-network output: all geometry comes from a self-contained deterministic algorithm (seeded PRNG + rejection sampling + MST). Under itch.io's quality guidelines this does NOT require a generative-AI tag. Keep it that way."
+    },
+    {
+      "slug": "texture-generator",
+      "title": "Weave \u2014 Procedural Seamless Texture Generator",
+      "tagline": "Tileable PBR textures from a seed: albedo, normal, roughness, height. Seams are impossible -- the noise lattice is periodic.",
+      "tags": ["textures", "texture-generator", "procedural-generation", "seamless", "tileable", "pbr", "game-assets", "tools"],
+      "kind": "html",
+      "classification": "tool",
+      "price_usd": 0,
+      "pay_what_you_want": false,
+      "launch_mode": "free",
+      "ai_disclosure": "none",
+      "_niche_note": "Chosen by scout v2 on 2026-09-11: demand tag 'textures' = 2,369 results with 14 paid at $12.52 median; supply tag 'texture-generator' = 0. Strongest gold-rush gap measured."
     }
   ]
 }

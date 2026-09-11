@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weave — Procedural Seamless Texture Generator</title>
+<style>
+  :root, body[data-theme=slate]{
+    --bg:#14121a; --panel:#1d1a26; --panel2:#241f30; --line:#332c44;
+    --ink:#e8e3f3; --dim:#9a91b0; --accent:#c8a2ff; --accent2:#7de0c0;
+  }
+  body[data-theme=ink]{
+    --bg:#efe6d2; --panel:#e2d7bd; --panel2:#d8ccae; --line:#b9ab8a;
+    --ink:#2e2818; --dim:#6d6248; --accent:#7a4f1d; --accent2:#2f6b57;
+  }
+  body[data-theme=blueprint]{
+    --bg:#0d1f33; --panel:#12283f; --panel2:#173350; --line:#274a6d;
+    --ink:#cfe8ff; --dim:#7ea6c9; --accent:#7fc4ff; --accent2:#6ef3c7;
+  }
+  body[data-theme=mono]{
+    --bg:#f4f4f4; --panel:#e6e6e6; --panel2:#d9d9d9; --line:#b3b3b3;
+    --ink:#111; --dim:#555; --accent:#000; --accent2:#333;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  header{
+    display:flex; align-items:center; gap:12px; padding:10px 16px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:0 0 auto;
+  }
+  header h1{font-size:15px; margin:0; letter-spacing:.4px; font-weight:650}
+  header h1 span{color:var(--accent)}
+  header .tag{color:var(--dim); font-size:12px}
+  header .spacer{flex:1}
+  main{display:flex; flex:1; min-height:0}
+  aside{
+    width:264px; flex:0 0 264px; background:var(--panel);
+    border-right:1px solid var(--line); overflow-y:auto; padding:14px;
+  }
+  .group{margin-bottom:16px}
+  .group h2{
+    font-size:11px; text-transform:uppercase; letter-spacing:1.1px;
+    color:var(--dim); margin:0 0 9px; font-weight:600;
+  }
+  label{display:block; margin-bottom:10px}
+  label .row{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+  label .name{font-size:12.5px}
+  label .val{color:var(--accent2); font-variant-numeric:tabular-nums; font-size:12px}
+  input[type=range]{width:100%; margin:4px 0 0; accent-color:var(--accent)}
+  select,input[type=text]{
+    width:100%; background:var(--panel2); color:var(--ink);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px;
+    font:inherit; font-size:12.5px;
+  }
+  input[type=text]{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .checks label{display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer}
+  .checks input{accent-color:var(--accent); width:15px; height:15px; margin:0}
+  button{
+    background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:7px 10px; font:inherit; font-size:12.5px;
+    cursor:pointer; transition:background .12s,border-color .12s;
+  }
+  button:hover{filter:brightness(1.12)}
+  button.primary{background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:650}
+  .btnrow{display:grid; grid-template-columns:1fr 1fr; gap:7px}
+  .btnrow.full{grid-template-columns:1fr}
+  #stage{flex:1; position:relative; min-width:0; background:var(--bg)}
+  canvas#cv{position:absolute; inset:0; width:100%; height:100%; display:block; cursor:grab}
+  canvas#cv:active{cursor:grabbing}
+  #hud{position:absolute; left:12px; bottom:12px; display:flex; gap:8px; flex-wrap:wrap; pointer-events:none}
+  .pill{
+    background:color-mix(in srgb, var(--panel) 88%, transparent);
+    border:1px solid var(--line); border-radius:999px;
+    padding:4px 11px; font-size:11.5px; color:var(--dim);
+    font-variant-numeric:tabular-nums;
+  }
+  .pill b{color:var(--ink); font-weight:600}
+  #toast{
+    position:absolute; top:12px; left:50%; transform:translateX(-50%) translateY(-8px);
+    background:var(--accent2); color:var(--bg); padding:7px 14px; border-radius:6px;
+    font-size:12.5px; font-weight:600; opacity:0; transition:.25s; pointer-events:none;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+  .note{color:var(--dim); font-size:11.5px; margin-top:8px; line-height:1.45}
+  code{background:var(--panel2); padding:1px 4px; border-radius:3px; font-size:11.5px}
+  @media (max-width:720px){ aside{width:200px; flex-basis:200px} }
+</style>
+</head>
+<body data-theme="slate">
+<header>
+  <h1>WEAVE <span>·</span> seamless texture generator</h1>
+  <span class="tag">periodic lattice noise — tiles forever, no seams, no assets</span>
+  <span class="spacer"></span>
+  <span class="tag" id="msTag"></span>
+</header>
+
+<main>
+<aside>
+  <div class="group">
+    <h2>Seed</h2>
+    <label><input type="text" id="seed" spellcheck="false" autocomplete="off">
+      <div class="note">Same seed + same settings = same texture, byte for byte.</div>
+    </label>
+    <div class="btnrow">
+      <button id="randomize">Random</button>
+      <button id="copySeed">Copy</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Material</h2>
+    <label><select id="material">
+      <option value="stone-brick">Stone brick</option>
+      <option value="wood-planks">Wood planks</option>
+      <option value="metal-plate">Metal plate</option>
+      <option value="marble">Marble / vein stone</option>
+      <option value="fabric">Woven fabric</option>
+    </select></label>
+    <label><div class="row"><span class="name">View map</span></div>
+      <select id="map">
+        <option value="albedo">Albedo (colour)</option>
+        <option value="height">Height</option>
+        <option value="normal">Normal (OpenGL)</option>
+        <option value="roughness">Roughness</option>
+      </select></label>
+    <label><div class="row"><span class="name">Resolution</span></div>
+      <select id="res">
+        <option>128</option><option selected>256</option>
+        <option>512</option><option>1024</option>
+      </select></label>
+  </div>
+
+  <div class="group">
+    <h2>Shape</h2>
+    <label><div class="row"><span class="name">Noise scale</span><span class="val" id="scaleV"></span></div>
+      <input type="range" id="scale" min="2" max="16" step="1" value="6"></label>
+    <label><div class="row"><span class="name">Detail octaves</span><span class="val" id="detailV"></span></div>
+      <input type="range" id="detail" min="1" max="6" step="1" value="4"></label>
+    <label><div class="row"><span class="name">Feature density</span><span class="val" id="featureV"></span></div>
+      <input type="range" id="feature" min="2" max="24" step="1" value="8"></label>
+    <label><div class="row"><span class="name">Warp</span><span class="val" id="warpV"></span></div>
+      <input type="range" id="warp" min="0" max="100" step="1" value="35"></label>
+    <label><div class="row"><span class="name">Contrast</span><span class="val" id="contrastV"></span></div>
+      <input type="range" id="contrast" min="20" max="220" step="1" value="100"></label>
+    <label><div class="row"><span class="name">Brightness</span><span class="val" id="brightV"></span></div>
+      <input type="range" id="bright" min="-60" max="60" step="1" value="0"></label>
+  </div>
+
+  <div class="group">
+    <h2>View</h2>
+    <label><div class="row"><span class="name">Theme</span></div>
+      <select id="style">
+        <option value="slate" selected>Slate (dark)</option>
+        <option value="ink">Ink (light)</option>
+        <option value="blueprint">Blueprint</option>
+        <option value="mono">Mono</option>
+      </select></label>
+    <div class="checks">
+      <label><input type="checkbox" id="optTiled"> 3×3 tiled preview (seam proof)</label>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Generate</h2>
+    <div class="btnrow full"><button class="primary" id="gen">Generate texture</button></div>
+  </div>
+
+  <div class="group">
+    <h2>Export</h2>
+    <div class="btnrow">
+      <button id="png">Map PNG</button>
+      <button id="sheet">PBR sheet</button>
+      <button id="json">Params JSON</button>
+      <button id="allpng">4 maps</button>
+    </div>
+    <div class="note">
+      <b>PBR sheet</b> = one 2×2 PNG: albedo, normal, roughness, height.
+      Every map wraps perfectly: the noise lattice is periodic, so left edge
+      meets right edge and top meets bottom by construction.
+    </div>
+  </div>
+</aside>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <span class="pill" id="statsLine"></span>
+    <span class="pill">scroll to zoom · drag to pan</span>
+  </div>
+  <div id="toast"></div>
+</div>
+</main>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+   Deterministic PRNG. No Math.random in generation: a seed and the
+   settings fully determine every byte of every map.
+   ------------------------------------------------------------------ */
+function cyrb128(str){
+  let h1=1779033703,h2=3144134277,h3=1013904242,h4=2773480762;
+  for(let i=0,k;i<str.length;i++){
+    k=str.charCodeAt(i);
+    h1=h2^Math.imul(h1^k,597399067); h2=h3^Math.imul(h2^k,2869860233);
+    h3=h4^Math.imul(h3^k,951274213); h4=h1^Math.imul(h4^k,2716044179);
+  }
+  h1=Math.imul(h3^(h1>>>18),597399067); h2=Math.imul(h4^(h2>>>22),2869860233);
+  h3=Math.imul(h1^(h3>>>17),951274213); h4=Math.imul(h2^(h4>>>19),2716044179);
+  return [(h1^h2^h3^h4)>>>0,(h2^h1)>>>0,(h3^h1)>>>0,(h4^h1)>>>0];
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296;};}
+function rngFromSeed(seed){return mulberry32(cyrb128(String(seed))[0]);}
+function hash2(x,y,s){let h=Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(s,1442695041);
+  h=Math.imul(h^h>>>13,1274126177);return ((h^h>>>16)>>>0)/4294967296;}
+
+const ADJ=["woven","brazen","sunken","gilded","ashen","verdant","frozen","molten",
+  "pale","thorned","drowned","radiant","grim","hollow","silent","crimson"];
+const NOUN=["linen","granite","oak","iron","jade","basalt","canvas","copper",
+  "walnut","slate","velvet","bronze"];
+function randomSeed(r){const q=r||Math.random;
+  return `${ADJ[Math.floor(q()*ADJ.length)]}-${NOUN[Math.floor(q()*NOUN.length)]}-${Math.floor(q()*9000+1000)}`;}
+
+/* ------------------------------------------------------------------
+   Periodic value noise. The lattice wraps at `period`, so every
+   octave -- and therefore every material built on top -- is exactly
+   periodic across the tile. Seams are impossible, not unlikely.
+   ------------------------------------------------------------------ */
+function makeNoise(rnd, period){
+  const p=Math.max(2,period|0), g=new Float32Array(p*p);
+  for(let i=0;i<g.length;i++) g[i]=rnd()*2-1;
+  const lat=(x,y)=>g[(((y%p)+p)%p)*p+(((x%p)+p)%p)];
+  const sm=t=>t*t*(3-2*t);
+  return function(x,y){
+    const x0=Math.floor(x),y0=Math.floor(y),fx=sm(x-x0),fy=sm(y-y0);
+    const a=lat(x0,y0),b=lat(x0+1,y0),c=lat(x0,y0+1),d=lat(x0+1,y0+1);
+    return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;
+  };
+}
+function makeFbm(rnd, base, octaves){
+  const octs=[]; let p=base, amp=1, tot=0;
+  for(let i=0;i<octaves;i++){octs.push({n:makeNoise(rnd,p),p,amp});tot+=amp;amp*=0.5;p*=2;}
+  return (u,v)=>{let s=0;for(const o of octs)s+=o.amp*o.n(u*o.p,v*o.p);return s/tot;};
+}
+const clamp01=x=>x<0?0:x>1?1:x;
+const sstep=(a,b,x)=>{const t=clamp01((x-a)/(b-a));return t*t*(3-2*t);};
+const frac=x=>x-Math.floor(x);
+
+/* ------------------------------------------------------------------
+   Materials. Each returns height h in [0,1] and albedo colour.
+   ------------------------------------------------------------------ */
+const PALETTES={
+  "stone-brick":{dark:[52,49,46], light:[142,136,127], rough:0.85},
+  "wood-planks":{dark:[64,40,24],  light:[158,110,66], rough:0.62},
+  "metal-plate":{dark:[58,62,70],  light:[158,166,178],rough:0.38},
+  "marble":      {dark:[86,88,96],  light:[232,230,226],rough:0.22},
+  "fabric":      {dark:[70,44,52],  light:[176,120,132],rough:0.92},
+};
+
+function generate(opts){
+  const t0=performance.now();
+  const {seed,material,res,scale,detail,feature,warp,contrast,bright}=opts;
+  const rnd=rngFromSeed(seed+"|"+material);
+  const fbm=makeFbm(rnd,scale,detail);
+  const fbm2=makeFbm(rnd,Math.max(2,scale>>1),detail);
+  const N=res, H=new Float32Array(N*N), C=new Uint8ClampedArray(N*N*3);
+  const W=warp/100, F=feature;
+  const salt=(cyrb128(seed+material)[1]&1023);
+
+  for(let y=0;y<N;y++){
+    const v=y/N;
+    for(let x=0;x<N;x++){
+      const u=x/N;
+      let h=0.5, cr=0, cg=0, cb=0;
+      const w1=fbm(u,v), w2=fbm2(u+0.37,v+0.71);
+      const uw=u+W*0.03*w1, vw=v+W*0.03*w2;
+
+      if(material==="stone-brick"){
+        const rows=F, cols=F*2;
+        const ry=v*rows, row=Math.floor(ry);
+        const off=(row%2)*0.5;
+        const rx=uw*cols+off, col=Math.floor(rx);
+        const bx=frac(rx), by=frac(ry);
+        const edge=Math.min(bx,1-bx,  (Math.min(by,1-by))*2);
+        const mortar=1-sstep(0.02,0.09,edge);
+        const tone=hash2(col,row,salt);
+        h=0.42+0.22*tone+0.16*w1-0.55*mortar;
+        const gsh=0.85+0.3*tone;
+        cr=142*gsh; cg=136*gsh; cb=127*gsh;
+        cr=cr*(1-mortar)+52*mortar; cg=cg*(1-mortar)+49*mortar; cb=cb*(1-mortar)+46*mortar;
+      }
+      else if(material==="wood-planks"){
+        const rows=F;
+        const ry=v*rows+0.12*w2, row=Math.floor(ry), by=frac(ry);
+        const groove=1-sstep(0.02,0.07,Math.min(by,1-by));
+        const grain=fbm2(u*2.0, v*22.0);
+        const rings=Math.sin((v*rows+0.35*grain+hash2(row,7,salt)*6.283)*3.0);
+        const tone=hash2(row,3,salt);
+        h=0.45+0.18*tone+0.14*grain+0.08*rings-0.5*groove;
+        const gsh=0.8+0.4*tone+0.15*rings;
+        cr=158*gsh; cg=110*gsh; cb=66*gsh;
+        cr=cr*(1-groove)+40*groove; cg=cg*(1-groove)+26*groove; cb=cb*(1-groove)+16*groove;
+      }
+      else if(material==="metal-plate"){
+        const P=Math.max(2,Math.round(F/3));
+        const px=frac(u*P), py=frac(v*P);
+        const cx=Math.floor(u*P), cy=Math.floor(v*P);
+        const seam=1-sstep(0.015,0.05,Math.min(px,1-px,py,1-py));
+        const dx=Math.min(px,1-px), dy=Math.min(py,1-py);
+        const rivet=sstep(0.16,0.06,Math.hypot(dx,dy));
+        const brushed=fbm2(u*3,v*60)*0.5+0.5;
+        const tone=hash2(cx,cy,salt);
+        h=0.55+0.10*brushed+0.30*rivet-0.45*seam+0.05*tone;
+        const gsh=0.85+0.25*brushed+0.1*tone;
+        cr=158*gsh; cg=166*gsh; cb=178*gsh;
+        cr=cr+(220-cr)*rivet*0.6; cg=cg+(226-cg)*rivet*0.6; cb=cb+(232-cb)*rivet*0.6;
+        cr=cr*(1-seam)+40*seam; cg=cg*(1-seam)+44*seam; cb=cb*(1-seam)+50*seam;
+      }
+      else if(material==="marble"){
+        const vein=Math.abs(Math.sin((u*2+1.6*w1)*Math.PI*3+w2*3.5));
+        const vp=Math.pow(1-vein,3);
+        h=0.62+0.18*w1-0.42*vp;
+        const gsh=0.75+0.25*(1-vp)+0.08*w2;
+        cr=232*gsh-146*vp; cg=230*gsh-144*vp; cb=226*gsh-140*vp;
+      }
+      else{ /* fabric */
+        const n=F*3;
+        const cu=Math.sin(u*Math.PI*2*n), cv2=Math.sin(v*Math.PI*2*n);
+        const over=(Math.floor(u*n)+Math.floor(v*n))&1;
+        const thread=over?cu:cv2;
+        const fuzz=fbm2(u*8,v*8);
+        h=0.5+0.22*thread+0.10*fuzz;
+        const gsh=0.82+0.22*thread+0.1*fuzz;
+        cr=176*gsh; cg=120*gsh; cb=132*gsh;
+      }
+
+      h=clamp01(h);
+      H[y*N+x]=h;
+      const k=(y*N+x)*3;
+      C[k]=cr; C[k+1]=cg; C[k+2]=cb;
+    }
+  }
+
+  // contrast / brightness on albedo
+  const cf=contrast/100, bf=bright;
+  for(let i=0;i<N*N*3;i++){
+    C[i]=clamp01(((C[i]/255)-0.5)*cf+0.5+bf/255)*255;
+  }
+
+  // normal map from height (wrap-aware sobel)
+  const NM=new Uint8ClampedArray(N*N*3);
+  const st=2.2;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const xl=H[y*N+((x-1+N)%N)], xr=H[y*N+((x+1)%N)];
+    const yu=H[((y-1+N)%N)*N+x], yd=H[((y+1)%N)*N+x];
+    let nx=(xl-xr)*st, ny=(yu-yd)*st, nz=1;
+    const l=Math.hypot(nx,ny,nz); nx/=l; ny/=l; nz/=l;
+    const k=(y*N+x)*3;
+    NM[k]=(nx*0.5+0.5)*255; NM[k+1]=(ny*0.5+0.5)*255; NM[k+2]=(nz*0.5+0.5)*255;
+  }
+  // roughness + height maps
+  const rb=PALETTES[material].rough;
+  const RM=new Uint8ClampedArray(N*N*3), GM=new Uint8ClampedArray(N*N*3);
+  for(let i=0;i<N*N;i++){
+    const r=clamp01(rb+(0.5-H[i])*0.5)*255;
+    const g=H[i]*255;
+    const k=i*3;
+    RM[k]=RM[k+1]=RM[k+2]=r;
+    GM[k]=GM[k+1]=GM[k+2]=g;
+  }
+
+  return {H,C,NM,RM,GM,N,material,seed,
+          ms:performance.now()-t0,opts};
+}
+
+/* ------------------------------------------------------------------
+   Rendering
+   ------------------------------------------------------------------ */
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+let state=null, view={scale:2,ox:0,oy:0};
+let dpr=Math.max(1,window.devicePixelRatio||1);
+const mapCv=document.createElement("canvas");
+const tiledCv=document.createElement("canvas");
+
+function mapCanvas(g,which){
+  const N=g.N; mapCv.width=N; mapCv.height=N;
+  const mc=mapCv.getContext("2d");
+  const img=mc.createImageData(N,N);
+  const src=which==="albedo"?g.C:which==="normal"?g.NM:which==="roughness"?g.RM:g.GM;
+  for(let i=0;i<N*N;i++){
+    const k=i*4, j=i*3;
+    img.data[k]=src[j]; img.data[k+1]=src[j+1]; img.data[k+2]=src[j+2]; img.data[k+3]=255;
+  }
+  mc.putImageData(img,0,0);
+  return mapCv;
+}
+function buildTiled(g,which){
+  const N=g.N; tiledCv.width=N*3; tiledCv.height=N*3;
+  const tc=tiledCv.getContext("2d");
+  const m=mapCanvas(g,which);
+  for(let y=0;y<3;y++)for(let x=0;x<3;x++) tc.drawImage(m,x*N,y*N);
+  return tiledCv;
+}
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=Math.floor(r.width*dpr); cv.height=Math.floor(r.height*dpr);
+  draw();
+}
+window.addEventListener("resize",resize);
+function fit(){
+  if(!state) return;
+  const r=cv.parentElement.getBoundingClientRect();
+  const side=state.tiled?3:1;
+  const s=Math.min(r.width/(state.N*side+8), r.height/(state.N*side+8));
+  view.scale=s;
+  view.ox=(r.width-state.N*side*s)/2;
+  view.oy=(r.height-state.N*side*s)/2;
+  draw();
+}
+function draw(){
+  if(!state) return;
+  const r=cv.parentElement.getBoundingClientRect();
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=getComputedStyle(document.body).getPropertyValue("--bg")||"#14121a";
+  ctx.fillRect(0,0,r.width,r.height);
+  const src=state.tiled?buildTiled(state,state.which):mapCanvas(state,state.which);
+  ctx.imageSmoothingEnabled=view.scale<1.2;
+  ctx.save(); ctx.translate(view.ox,view.oy); ctx.scale(view.scale,view.scale);
+  ctx.drawImage(src,0,0);
+  ctx.restore();
+}
+let dragging=false,lx=0,ly=0;
+cv.addEventListener("pointerdown",e=>{dragging=true;lx=e.clientX;ly=e.clientY;cv.setPointerCapture(e.pointerId);});
+cv.addEventListener("pointermove",e=>{if(!dragging)return;
+  view.ox+=e.clientX-lx;view.oy+=e.clientY-ly;lx=e.clientX;ly=e.clientY;draw();});
+cv.addEventListener("pointerup",()=>dragging=false);
+cv.addEventListener("pointercancel",()=>dragging=false);
+cv.addEventListener("wheel",e=>{
+  e.preventDefault();
+  const r=cv.getBoundingClientRect();
+  const mx=e.clientX-r.left,my=e.clientY-r.top;
+  const b={x:(mx-view.ox)/view.scale,y:(my-view.oy)/view.scale};
+  view.scale=Math.min(24,Math.max(0.2,view.scale*(e.deltaY<0?1.12:1/1.12)));
+  view.ox=mx-b.x*view.scale; view.oy=my-b.y*view.scale; draw();
+},{passive:false});
+
+/* ------------------------------------------------------------------
+   UI
+   ------------------------------------------------------------------ */
+const $=id=>document.getElementById(id);
+function syncLabels(){
+  $("scaleV").textContent=$("scale").value;
+  $("detailV").textContent=$("detail").value;
+  $("featureV").textContent=$("feature").value;
+  $("warpV").textContent=($("warp").value/100).toFixed(2);
+  $("contrastV").textContent=$("contrast").value+"%";
+  $("brightV").textContent=$("bright").value;
+}
+function readOpts(){
+  return {seed:$("seed").value.trim()||"weave", material:$("material").value,
+    res:+$("res").value, scale:+$("scale").value, detail:+$("detail").value,
+    feature:+$("feature").value, warp:+$("warp").value,
+    contrast:+$("contrast").value, bright:+$("bright").value};
+}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1500);}
+function regen(){
+  const o=readOpts();
+  const g=generate(o);
+  g.which=$("map").value; g.tiled=$("optTiled").checked;
+  const first=!state;
+  state=g;
+  if(first) fit(); else draw();
+  $("statsLine").innerHTML=
+    `<b>${g.material}</b> · ${g.N}×${g.N} · ${o.detail} oct · gen ${g.ms.toFixed(1)} ms · seamless by construction`;
+  $("msTag").textContent=`gen ${g.ms.toFixed(1)} ms · ${g.N}×${g.N}`;
+}
+["scale","detail","feature","warp","contrast","bright"].forEach(id=>
+  $(id).addEventListener("input",()=>{syncLabels();regen();}));
+["material","map","res"].forEach(id=>$(id).addEventListener("change",regen));
+$("optTiled").addEventListener("change",()=>{state.tiled=$("optTiled").checked;fit();});
+$("style").addEventListener("change",()=>{
+  document.body.dataset.theme=$("style").value; draw();});
+$("gen").addEventListener("click",()=>{regen();toast("Generated "+state.seed);});
+$("randomize").addEventListener("click",()=>{$("seed").value=randomSeed();regen();});
+$("seed").addEventListener("change",regen);
+$("copySeed").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText($("seed").value);toast("Seed copied");}
+  catch(_){$("seed").select();document.execCommand("copy");toast("Seed copied");}});
+
+function safeName(){return String(state.seed).replace(/[^\w.-]+/g,"_").slice(0,48);}
+function download(href,name){const a=document.createElement("a");
+  a.href=href;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+function exportMap(which,mult){
+  const g=state, N=g.N;
+  const c=document.createElement("canvas");c.width=N*mult;c.height=N*mult;
+  const x=c.getContext("2d");x.imageSmoothingEnabled=false;
+  x.drawImage(mapCanvas(g,which),0,0,N*mult,N*mult);
+  download(c.toDataURL("image/png"),`weave-${safeName()}-${which}-${N*mult}.png`);
+  toast(which+" exported");
+}
+$("png").addEventListener("click",()=>exportMap($("map").value,1));
+$("allpng").addEventListener("click",()=>{
+  ["albedo","normal","roughness","height"].forEach((w,i)=>
+    setTimeout(()=>exportMap(w,1),i*250));
+});
+$("sheet").addEventListener("click",()=>{
+  const g=state,N=g.N;
+  const c=document.createElement("canvas");c.width=N*2;c.height=N*2;
+  const x=c.getContext("2d");x.imageSmoothingEnabled=false;
+  x.drawImage(mapCanvas(g,"albedo"),0,0);
+  x.drawImage(mapCanvas(g,"normal"),N,0);
+  x.drawImage(mapCanvas(g,"roughness"),0,N);
+  x.drawImage(mapCanvas(g,"height"),N,N);
+  download(c.toDataURL("image/png"),`weave-${safeName()}-pbr-sheet-${N*2}.png`);
+  toast("PBR sheet exported");
+});
+$("json").addEventListener("click",()=>{
+  const o=readOpts();
+  download(URL.createObjectURL(new Blob([JSON.stringify(
+    {generator:"weave",version:1,...o},null,2)],{type:"application/json"})),
+    `weave-${safeName()}.json`);
+  toast("Params exported");
+});
+window.addEventListener("keydown",e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();regen();}
+  if(e.key==="r"||e.key==="R"){$("seed").value=randomSeed();regen();}
+  if(e.key==="f"||e.key==="F")fit();
+  if(e.key==="t"||e.key==="T"){$("optTiled").checked=!$("optTiled").checked;
+    state.tiled=$("optTiled").checked;fit();}
+});
+
+$("seed").value=randomSeed();
+syncLabels();
+resize();
+regen();
+setTimeout(fit,30);
+</script>
+</body>
+</html>

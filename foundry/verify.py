@@ -73,11 +73,10 @@ def verify(tool_dir: Path, shots_dir: Path) -> bool:
               const k = d[i]+','+d[i+1]+','+d[i+2];
               seen.add(k);
             }
+            const g = id => { const e = document.getElementById(id); return e ? e.textContent : ''; };
             return {w:cv.width,h:cv.height,distinct:seen.size,
-                    stats:{rooms:document.getElementById('sRooms').textContent,
-                           tiles:document.getElementById('sTiles').textContent,
-                           doors:document.getElementById('sDoors').textContent,
-                           ms:document.getElementById('msTag').textContent}};
+                    statsLine:(document.getElementById('statsLine')||{}).textContent||'',
+                    stats:{rooms:g('sRooms'),tiles:g('sTiles'),doors:g('sDoors'),ms:g('msTag')}};
         }""")
         if not stats:
             fail("no #cv canvas found")
@@ -88,8 +87,13 @@ def verify(tool_dir: Path, shots_dir: Path) -> bool:
         else:
             ok(f"canvas rendered ({stats['w']}x{stats['h']}, "
                f"{stats['distinct']} distinct colours)")
-        ok(f"stats: rooms={stats['stats']['rooms']} tiles={stats['stats']['tiles']} "
-           f"doors={stats['stats']['doors']} [{stats['stats']['ms']}]")
+        line = stats.get("statsLine") or ""
+        if line.strip():
+            ok(f"stats: {line.strip()[:90]}")
+        elif any(stats.get("stats", {}).values()):
+            st = stats["stats"]
+            ok(f"stats: rooms={st.get('rooms')} tiles={st.get('tiles')} "
+               f"doors={st.get('doors')} [{st.get('ms')}]")
 
         # 3. determinism: fingerprint the canvas for a fixed seed
         def fingerprint() -> str:
@@ -122,37 +126,47 @@ def verify(tool_dir: Path, shots_dir: Path) -> bool:
         else:
             ok(f"seed-sensitive (different seed -> {f3})")
 
-        # 5. parameter extremes must not throw
+        # 5. parameter extremes must not throw (generic: every slider and
+        #    every select on the page, whatever the tool is)
         errors.clear()
-        extremes = [
-            {"w": 32, "h": 24, "rooms": 4, "rsize": 4, "rvar": 0, "cw": 1, "loops": 0},
-            {"w": 160, "h": 120, "rooms": 40, "rsize": 16, "rvar": 10, "cw": 4, "loops": 10},
-            {"w": 32, "h": 24, "rooms": 40, "rsize": 16, "rvar": 10, "cw": 4, "loops": 10},
-        ]
-        for i, ex in enumerate(extremes):
-            page.evaluate("""(o) => {
-                for (const k in o) {
-                    const el = document.getElementById(k);
-                    el.value = o[k];
-                    el.dispatchEvent(new Event('input'));
+        page.evaluate("""() => {
+            document.querySelectorAll('input[type=range]').forEach(r => {
+                r.value = r.min; r.dispatchEvent(new Event('input'));
+            });
+        }""")
+        page.wait_for_timeout(300)
+        page.evaluate("""() => {
+            document.querySelectorAll('input[type=range]').forEach(r => {
+                r.value = r.max; r.dispatchEvent(new Event('input'));
+            });
+        }""")
+        page.wait_for_timeout(300)
+        page.evaluate("""async () => {
+            for (const s of document.querySelectorAll('select')) {
+                for (let i = 0; i < s.options.length; i++) {
+                    s.selectedIndex = i;
+                    s.dispatchEvent(new Event('change'));
+                    await new Promise(r => setTimeout(r, 120));
                 }
-            }""", ex)
-            page.wait_for_timeout(250)
+            }
+        }""")
+        page.wait_for_timeout(300)
         if errors:
             fail(f"threw on extreme parameters: {errors[:3]}")
             passed = False
         else:
-            ok(f"survived {len(extremes)} extreme parameter sets")
+            ok("survived all sliders at min/max and every select option")
 
         # 6. every style renders
         errors.clear()
         for style in ["ink", "blueprint", "slate", "mono"]:
             page.evaluate("""(s) => {
-                document.getElementById('w').value = 72;
-                document.getElementById('h').value = 48;
-                document.getElementById('w').dispatchEvent(new Event('input'));
+                const w = document.getElementById('w');
+                if (w) { w.value = 72; w.dispatchEvent(new Event('input', {bubbles:true})); }
                 const sel = document.getElementById('style');
-                sel.value = s; sel.dispatchEvent(new Event('change'));
+                sel.value = s;
+                sel.dispatchEvent(new Event('change', {bubbles:true}));
+                sel.dispatchEvent(new Event('input', {bubbles:true}));
             }""", style)
             page.wait_for_timeout(150)
             page.screenshot(path=str(shots_dir / f"{tool_dir.name}-{style}.png"))
@@ -164,14 +178,17 @@ def verify(tool_dir: Path, shots_dir: Path) -> bool:
 
         # 7. buttons don't throw
         errors.clear()
+        clicked = []
         for bid in ["randomize", "gen", "copySeed"]:
-            page.click(f"#{bid}")
-            page.wait_for_timeout(200)
+            if page.locator(f"#{bid}").count():
+                page.click(f"#{bid}")
+                page.wait_for_timeout(200)
+                clicked.append(bid)
         if errors:
             fail(f"button errors: {errors[:3]}")
             passed = False
         else:
-            ok("Random / Generate / Copy buttons all work")
+            ok(f"buttons work: {', '.join(clicked) if clicked else 'none present'}")
 
         browser.close()
 
