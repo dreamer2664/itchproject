@@ -251,9 +251,15 @@ butler not found -- falling back instructions (manual web upload):
    - or drop any butler.exe into .\\bin\\ yourself
 """)
         return 1
-    uname = cfg["itch"].get("username")
+    uname = (cfg["itch"].get("username") or os.environ.get("ITCH_USER") or "").strip()
     if not uname:
-        sys.exit('Set your itch username in config.json:  "itch": {"username": "..."}')
+        try:
+            uname = input("itch.io username (or set ITCH_USER / config.json): ").strip()
+        except EOFError:
+            uname = ""
+    if not uname:
+        sys.exit('Need your itch username: set ITCH_USER env var, or '
+                 '"itch": {"username": "..."} in config.json.')
 
     key_env = cfg["itch"].get("api_key_env", "BUTLER_API_KEY")
     if not os.environ.get(key_env):
