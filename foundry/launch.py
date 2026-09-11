@@ -192,7 +192,21 @@ def fill_page(page, sel: dict, copy: dict, files: dict) -> list[str]:
 
 def capture(page) -> Path:
     CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        page.wait_for_selector("input, select, textarea", timeout=30_000)
+    except Exception:
+        print("  ! no form element appeared within 30 s -- capturing anyway")
     fields = page.evaluate(CAPTURE_JS)
+    if sum(1 for f in fields if f.get("visible")) < 5:
+        print("  ! capture saw almost no visible form fields;")
+        print(f"    page was: {page.url}  title={page.title()!r}")
+        print("    waiting 5 s for the editor to finish rendering, retrying...")
+        page.wait_for_timeout(5000)
+        fields = page.evaluate(CAPTURE_JS)
+    (CAPTURE_DIR / "capture_meta.json").write_text(json.dumps(
+        {"url": page.url, "title": page.title(), "fields": len(fields),
+         "visible": sum(1 for f in fields if f.get("visible"))}, indent=1),
+        encoding="utf-8")
     out = CAPTURE_DIR / "editor_fields.json"
     out.write_text(json.dumps(fields, indent=1), encoding="utf-8")
     (CAPTURE_DIR / "editor_page.html").write_text(page.content(), encoding="utf-8")
