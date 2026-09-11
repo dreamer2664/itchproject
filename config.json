@@ -75,6 +75,28 @@
       "launch_mode": "free",
       "ai_disclosure": "none",
       "_niche_note": "Chosen 2026-09-11 per docs/INDUSTRY-DEMAND-2026-09.md: universal demand (every game needs SFX; Unity revenue guides call audio 'steady predictable income'), emptiest competition (2009-era jsfxr toys vs subscription AI clouds)."
+    },
+    {
+      "slug": "battlemap-generator",
+      "title": "TABLEFORGE — Procedural Battle Maps for Game Masters",
+      "tagline": "Seeded top-down battle maps in four environments -- caverns, crypts and sewers, sci-fi stations, forest clearings. Square grid, named points of interest, VTT-sized PNG exports.",
+      "tags": [
+        "tabletop",
+        "battlemap",
+        "rpg",
+        "vtt",
+        "dnd",
+        "game-master",
+        "procedural-generation",
+        "tools"
+      ],
+      "kind": "html",
+      "classification": "tool",
+      "price_usd": 0,
+      "pay_what_you_want": false,
+      "launch_mode": "free",
+      "ai_disclosure": "none",
+      "_niche_note": "Vertical #4 per docs/INDUSTRY-DEMAND-2026-09.md: tabletop = itch's 2nd most active community (18.3k projects, +135/wk); paid-tool willingness proven (Arkenforge, Dungeondraft); generator seat on the free shelf nearly empty."
     }
   ]
 }

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TABLEFORGE — procedural battle maps for game masters</title>
+<meta name="description" content="Seeded top-down battle maps for tabletop RPGs and VTTs: caverns, crypts and sewers, sci-fi stations, forest clearings. Square grid overlay, named points of interest, PNG exports sized for virtual tabletops. One file, offline, no AI.">
+<style>
+:root{ --bg:#14121a; --panel:#1d1a26; --panel2:#241f30; --line:#372f47;
+  --text:#e8e4f0; --dim:#9a92ab; --acc:#8fe388; --acc2:#ffd479; }
+body[data-theme="ink"]{ --bg:#f4f1ea; --panel:#fffdf7; --panel2:#efeadd; --line:#d8d2c2;
+  --text:#221f18; --dim:#6d675c; --acc:#2c7a3f; --acc2:#8a6d1b; }
+body[data-theme="blueprint"]{ --bg:#0e2a4a; --panel:#12395e; --panel2:#16436d; --line:#2a5c8c;
+  --text:#eaf4ff; --dim:#9dbbd8; --acc:#8fe388; --acc2:#ffd479; }
+body[data-theme="mono"]{ --bg:#101010; --panel:#1a1a1a; --panel2:#222; --line:#3a3a3a;
+  --text:#eee; --dim:#999; --acc:#ccc; --acc2:#aaa; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{display:flex;align-items:baseline;gap:10px;padding:10px 16px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{margin:0;font-size:16px;letter-spacing:.06em}
+header .sub{color:var(--dim);font-size:12px}
+header .right{margin-left:auto;color:var(--dim);font-size:12px}
+main{display:flex;height:calc(100% - 45px)}
+aside{width:300px;min-width:300px;overflow-y:auto;background:var(--panel);
+  border-right:1px solid var(--line);padding:12px}
+.group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:10px;margin-bottom:10px}
+.group h2{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+label{display:block;margin-bottom:8px}
+label .row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}
+label .val{color:var(--acc);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=text],select{width:100%;background:var(--bg);color:var(--text);
+  border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+.checks{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow.full button{width:100%}
+button{background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:#101418;border-color:transparent;font-weight:600}
+.note{font-size:11px;color:var(--dim);margin-top:6px}
+#legend{font-size:12px;color:var(--dim);margin-top:4px}
+#legend b{color:var(--acc2)}
+#stage{flex:1;position:relative;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  padding:4px 12px;font-size:12px;color:var(--dim)}
+.pill b{color:var(--text)}
+#toast{position:absolute;right:14px;bottom:14px;background:var(--panel);
+  border:1px solid var(--acc);border-radius:10px;padding:8px 14px;font-size:13px;
+  opacity:0;transform:translateY(6px);transition:.25s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body data-theme="slate">
+<header>
+  <h1>TABLEFORGE</h1>
+  <span class="sub">procedural battle maps for GMs — seeded, gridded, VTT-ready</span>
+  <span class="right" id="msTag"></span>
+</header>
+<main>
+<aside>
+  <div class="group">
+    <h2>Seed</h2>
+    <label><input type="text" id="seed" spellcheck="false" autocomplete="off">
+      <div class="note">Same seed + same settings = same map, cell for cell.</div>
+    </label>
+    <div class="btnrow">
+      <button id="randomize">Random</button>
+      <button id="copySeed">Copy</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Environment</h2>
+    <label><select id="family">
+      <option value="caverns" selected>Caverns</option>
+      <option value="crypt">Crypt / sewers</option>
+      <option value="station">Sci-fi station</option>
+      <option value="forest">Forest clearing</option>
+    </select></label>
+    <label><div class="row"><span class="name">Map width (cells)</span><span class="val" id="sizeV"></span></div>
+      <input type="range" id="size" min="32" max="120" step="4" value="64"></label>
+    <label><div class="row"><span class="name">Density</span><span class="val" id="densityV"></span></div>
+      <input type="range" id="density" min="0" max="100" step="1" value="50"></label>
+    <label><div class="row"><span class="name">Smoothing passes</span><span class="val" id="smoothV"></span></div>
+      <input type="range" id="smooth" min="1" max="8" step="1" value="4"></label>
+    <label><div class="row"><span class="name">Water</span><span class="val" id="waterV"></span></div>
+      <input type="range" id="water" min="0" max="100" step="1" value="30"></label>
+    <label><div class="row"><span class="name">Props &amp; dressing</span><span class="val" id="propsV"></span></div>
+      <input type="range" id="props" min="0" max="100" step="1" value="45"></label>
+  </div>
+
+  <div class="group">
+    <h2>Table</h2>
+    <div class="checks">
+      <label style="margin:0"><input type="checkbox" id="grid" checked> square grid</label>
+      <label style="margin:0"><input type="checkbox" id="labels" checked> POI labels</label>
+    </div>
+    <label style="margin-top:8px"><div class="row"><span class="name">Export scale</span></div>
+      <select id="xscale">
+        <option value="1" selected>1× (screen)</option>
+        <option value="2">2× (VTT / print)</option>
+      </select></label>
+    <label><div class="row"><span class="name">Theme</span></div>
+      <select id="style">
+        <option value="slate" selected>Slate (dark)</option>
+        <option value="ink">Ink (light, print-friendly)</option>
+        <option value="blueprint">Blueprint</option>
+        <option value="mono">Mono</option>
+      </select></label>
+    <div id="legend"></div>
+  </div>
+
+  <div class="group">
+    <h2>Forge</h2>
+    <div class="btnrow full"><button class="primary" id="gen">Generate map</button></div>
+    <div class="note">Space = regen · R = random seed.</div>
+  </div>
+
+  <div class="group">
+    <h2>Export</h2>
+    <div class="btnrow">
+      <button id="png">PNG (as viewed)</button>
+      <button id="clean">PNG (no grid)</button>
+      <button id="json">Params JSON</button>
+    </div>
+    <div class="note">
+      Exports are drawn at 12 px per cell × export scale on an offscreen
+      canvas: crisp squares for Roll20 / Foundry / Owlbear, or ink theme at
+      2× for the printer at the table.
+    </div>
+  </div>
+</aside>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <span class="pill" id="statsLine"></span>
+    <span class="pill">one square = one step</span>
+  </div>
+  <div id="toast"></div>
+</div>
+</main>
+
+<script>
+"use strict";
+/* ---------------- deterministic core ---------------- */
+function cyrb128(str){
+  let h1=1779033703,h2=3144134277,h3=374761393,h4=597399067;
+  for(let i=0,k;i<str.length;i++){
+    k=str.charCodeAt(i);
+    h1=h2^Math.imul(h1^k,597399067); h2=h3^Math.imul(h2^k,2869860233);
+    h3=h4^Math.imul(h3^k,951274213); h4=h1^Math.imul(h4^k,1442695041);
+  }
+  h1=Math.imul(h3^(h1>>>18),597399067); h2=Math.imul(h4^(h2>>>22),2869860233);
+  h3=Math.imul(h1^(h3>>>17),951274213); h4=Math.imul(h2^(h4>>>19),597399067);
+  return [(h1^h2^h3^h4)>>>0,(h2^h1)>>>0,(h3^h1)>>>0,(h4^h1)>>>0];
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296;};}
+function hash2(x,y,s){let h=Math.imul(x,374761393)^Math.imul(y,668265263)^Math.imul(s,1442695041);
+  h=Math.imul(h^h>>>13,1274126177);return ((h^h>>>16)>>>0)/4294967296;}
+const CP=12; /* cell pixels at 1x */
+
+/* cell codes */
+const FLOOR=0,WALL=1,WATER=2,PIT=3,PATH=4,TREE=5,DOOR=6,PROP=7;
+
+/* ---------------- generators ---------------- */
+function caFill(W,H,rnd,p){const g=new Uint8Array(W*H);
+  for(let i=0;i<g.length;i++)g[i]=rnd()<p?1:0;
+  for(let x=0;x<W;x++){g[x]=1;g[(H-1)*W+x]=1;}
+  for(let y=0;y<H;y++){g[y*W]=1;g[y*W+W-1]=1;}
+  return g;}
+function caStep(g,W,H){const o=new Uint8Array(W*H);
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let n=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      if(!dx&&!dy)continue;
+      const xx=x+dx,yy=y+dy;
+      n+=(xx<0||yy<0||xx>=W||yy>=H)?1:g[yy*W+xx];
+    }
+    o[y*W+x]=n>=5?1:0;
+  }
+  return o;}
+
+function genCaverns(W,H,rnd,o,salt){
+  let g=caFill(W,H,rnd,0.40+o.density*0.002);
+  for(let i=0;i<o.smooth;i++)g=caStep(g,W,H);
+  const cells=new Uint8Array(W*H);
+  for(let i=0;i<cells.length;i++)cells[i]=g[i]?WALL:FLOOR;
+  /* water pools + pits: second/third automata on floor only */
+  let w=caFill(W,H,rnd,0.05+o.water*0.0012);
+  for(let i=0;i<2;i++)w=caStep(w,W,H);
+  let p=caFill(W,H,rnd,0.04+o.density*0.0004);
+  for(let i=0;i<3;i++)p=caStep(p,W,H);
+  for(let i=0;i<cells.length;i++){
+    if(cells[i]!==FLOOR)continue;
+    if(w[i]&&o.water>0)cells[i]=WATER;
+    else if(p[i]&&o.density>8)cells[i]=PIT;
+  }
+  const props=[];
+  if(o.props>0)for(let y=1;y<H-1;y++)for(let x=1;x<W-1;x++){
+    if(cells[y*W+x]!==FLOOR)continue;
+    const nw=(cells[y*W+x-1]===WALL)+(cells[y*W+x+1]===WALL)+
+             (cells[y*W-W+x]===WALL)+(cells[y*W+W+x]===WALL);
+    if(nw>=1&&hash2(x,y,salt)<o.props*0.0012)props.push({x,y});
+  }
+  return {cells,W,H,props};
+}
+
+function placeRooms(W,H,rnd,count,minW,maxW,minH,maxH,pad){
+  const rooms=[];
+  for(let t=0;t<count*14&&rooms.length<count;t++){
+    const rw=minW+Math.floor(rnd()*(maxW-minW+1));
+    const rh=minH+Math.floor(rnd()*(maxH-minH+1));
+    const rx=1+Math.floor(rnd()*(W-rw-2));
+    const ry=1+Math.floor(rnd()*(H-rh-2));
+    let ok=true;
+    for(const r of rooms){
+      if(rx<r.x+r.w+pad&&r.x<rx+rw+pad&&ry<r.y+r.h+pad&&r.y<ry+rh+pad){ok=false;break;}
+    }
+    if(ok)rooms.push({x:rx,y:ry,w:rw,h:rh,
+      cx:rx+(rw>>1),cy:ry+(rh>>1)});
+  }
+  return rooms;
+}
+function carveL(g,W,H,a,b,wide){
+  let x=a.cx,y=a.cy;
+  const put=(xx,yy)=>{for(let dy=0;dy<wide;dy++)for(let dx=0;dx<wide;dx++){
+    const X=xx+dx,Y=yy+dy;
+    if(X>0&&Y>0&&X<W-1&&Y<H-1)g[Y*W+X]=FLOOR;}};
+  while(x!==b.cx){put(x,y);x+=x<b.cx?1:-1;}
+  while(y!==b.cy){put(x,y);y+=y<b.cy?1:-1;}
+  put(x,y);
+}
+function mstCorridors(g,W,H,rooms,wide){
+  if(!rooms.length)return;
+  const done=[rooms[0]];
+  while(done.length<rooms.length){
+    let bi=-1,bj=-1,bd=1e9;
+    for(const r of done)for(let j=0;j<rooms.length;j++){
+      if(done.includes(rooms[j]))continue;
+      const d=Math.abs(r.cx-rooms[j].cx)+Math.abs(r.cy-rooms[j].cy);
+      if(d<bd){bd=d;bi=done.indexOf(r);bj=j;}
+    }
+    carveL(g,W,H,done[bi],rooms[bj],wide);
+    done.push(rooms[bj]);
+  }
+}
+function genCrypt(W,H,rnd,o,salt){
+  const cells=new Uint8Array(W*H).fill(WALL);
+  const count=Math.max(3,Math.round(4+o.density*0.12));
+  const rooms=placeRooms(W,H,rnd,count,4,9,3,7,1);
+  for(const r of rooms)for(let y=r.y;y<r.y+r.h;y++)for(let x=r.x;x<r.x+r.w;x++)
+    cells[y*W+x]=FLOOR;
+  mstCorridors(cells,W,H,rooms,1);
+  /* flooded passage: pick one corridor line, water it */
+  if(o.water>20&&rooms.length>1){
+    const a=rooms[Math.floor(rnd()*rooms.length)];
+    const b=rooms[Math.floor(rnd()*rooms.length)];
+    let x=a.cx,y=a.cy;
+    const flood=()=>{ if(cells[y*W+x]===FLOOR&&hash2(x,y,salt^7)<0.85)cells[y*W+x]=WATER; };
+    while(x!==b.cx){flood();x+=x<b.cx?1:-1;}
+    while(y!==b.cy){flood();y+=y<b.cy?1:-1;}
+  }
+  const props=[];
+  for(const r of rooms){
+    if(r.w>=5&&r.h>=4&&o.props>10){
+      for(let y=r.y+1;y<r.y+r.h-1;y+=2)for(let x=r.x+1;x<r.x+r.w-1;x+=2)
+        if(hash2(x,y,salt)<o.props*0.008)props.push({x,y});
+    }
+  }
+  /* doors where corridors touch room rims */
+  const doors=[];
+  for(const r of rooms){
+    for(let x=r.x;x<r.x+r.w;x++){
+      for(const y of [r.y-1,r.y+r.h]){
+        if(y>0&&y<H-1&&cells[y*W+x]===FLOOR&&hash2(x,y,salt^3)<0.5)doors.push({x,y});
+      }
+    }
+  }
+  return {cells,W,H,props,doors,rooms};
+}
+function genStation(W,H,rnd,o,salt){
+  const cells=new Uint8Array(W*H).fill(WALL);
+  const count=Math.max(3,Math.round(4+o.density*0.10));
+  const rooms=placeRooms(W,H,rnd,count,5,10,4,8,2);
+  for(const r of rooms){
+    for(let y=r.y-1;y<=r.y+r.h;y++)for(let x=r.x-1;x<=r.x+r.w;x++){
+      if(x<0||y<0||x>=W||y>=H)continue;
+      const rim=(y===r.y-1||y===r.y+r.h||x===r.x-1||x===r.x+r.w);
+      cells[y*W+x]=rim?WALL:FLOOR;
+    }
+  }
+  mstCorridors(cells,W,H,rooms,1);
+  const props=[],doors=[];
+  for(const r of rooms){
+    const k=1+Math.floor(rnd()*3);
+    for(let i=0;i<k&&o.props>5;i++)
+      props.push({x:r.x+1+Math.floor(rnd()*Math.max(1,r.w-2)),
+                  y:r.y+1+Math.floor(rnd()*Math.max(1,r.h-2))});
+    doors.push({x:r.cx,y:r.y-1});
+  }
+  if(o.water>55){ /* coolant leak */
+    const r=rooms[Math.floor(rnd()*rooms.length)];
+    if(r)for(let i=0;i<r.w*r.h/4;i++){
+      const x=r.x+Math.floor(rnd()*r.w),y=r.y+Math.floor(rnd()*r.h);
+      if(cells[y*W+x]===FLOOR)cells[y*W+x]=WATER;
+    }
+  }
+  return {cells,W,H,props,doors,rooms};
+}
+function genForest(W,H,rnd,o,salt){
+  const cells=new Uint8Array(W*H).fill(FLOOR);
+  /* winding path left->right */
+  let y=Math.floor(H/2)+(rnd()*6|0)-3;
+  for(let x=0;x<W;x++){
+    for(let dy=-1;dy<=1;dy++){const Y=y+dy;if(Y>0&&Y<H-1)cells[Y*W+x]=PATH;}
+    y+= (hash2(x,1,salt)<0.35? (hash2(x,2,salt)<0.5?1:-1):0);
+    y=Math.max(2,Math.min(H-3,y));
+  }
+  /* stream top->bottom */
+  if(o.water>10){
+    let x=Math.floor(W*0.3+rnd()*W*0.4);
+    for(let yy=0;yy<H;yy++){
+      for(let dx=0;dx<=1;dx++){const X=x+dx;if(X>0&&X<W-1)cells[yy*W+X]=WATER;}
+      x+=(hash2(3,yy,salt)<0.35?(hash2(4,yy,salt)<0.5?1:-1):0);
+      x=Math.max(2,Math.min(W-3,x));
+    }
+  }
+  /* clearing */
+  const cxp=Math.floor(W*0.5+(rnd()-0.5)*W*0.3), cyp=Math.floor(H*0.5+(rnd()-0.5)*H*0.3);
+  const cr=Math.max(3,Math.round(3+o.density*0.05));
+  /* trees on jittered grid */
+  const trees=[];
+  const step=2;
+  for(let yy=1;yy<H-1;yy+=step)for(let xx=1;xx<W-1;xx+=step){
+    const X=xx+(hash2(xx,yy,salt^9)<0.5?1:0), Y=yy+(hash2(xx,yy,salt^11)<0.5?1:0);
+    if(X>=W-1||Y>=H-1)continue;
+    if(cells[Y*W+X]!==FLOOR)continue;
+    const dc=Math.hypot(X-cxp,Y-cyp);
+    if(dc<cr)continue;
+    if(hash2(X,Y,salt^5)<0.25+o.density*0.006)trees.push({x:X,y:Y});
+  }
+  for(const t of trees)cells[t.y*W+t.x]=TREE;
+  const props=[];
+  if(o.props>10){ /* campfire + stones in clearing */
+    props.push({x:cxp,y:cyp});
+    for(let i=0;i<4;i++)props.push({x:cxp+1+((i%2)*2)-1,y:cyp+1+((i>>1)*2)-1});
+  }
+  return {cells,W,H,props,clearing:{x:cxp,y:cyp,r:cr}};
+}
+
+const POI={
+  caverns:["Chasm Bridge","Collapsed Shaft","Bat Roost","Old Mine Works","Fungal Garden","Echo Chamber","Underground Lake"],
+  crypt:["Sunken Gallery","Bone Niche","Sealed Vault","Flooded Ossuary","Shrine of Dust","Guard Room"],
+  station:["Airlock A","Reactor Core","Crew Quarters","Med Bay","Cargo Hold","Bridge","Hydroponics"],
+  forest:["Old Ford","Ruined Watchtower","Camp of the Party","Hunter's Blind","Standing Stones","Bee Trees"],
+};
+
+function generate(o){
+  const t0=performance.now();
+  const h=cyrb128(o.seed+"|"+o.family);
+  const rnd=mulberry32(h[0]);
+  const salt=h[1]&4095;
+  const W=o.size, H=Math.max(24,Math.round(o.size*0.72));
+  let m;
+  if(o.family==="caverns")m=genCaverns(W,H,rnd,o,salt);
+  else if(o.family==="crypt")m=genCrypt(W,H,rnd,o,salt);
+  else if(o.family==="station")m=genStation(W,H,rnd,o,salt);
+  else m=genForest(W,H,rnd,o,salt);
+  /* POI markers: spread on walkable cells */
+  const names=POI[o.family];
+  const pois=[];
+  const walkable=(x,y)=>{const c=m.cells[y*m.W+x];
+    return c===FLOOR||c===PATH||c===DOOR;};
+  for(let t=0;t<60&&pois.length<Math.min(4,names.length);t++){
+    const x=2+Math.floor(rnd()*(m.W-4)), y=2+Math.floor(rnd()*(m.H-4));
+    if(!walkable(x,y))continue;
+    if(pois.some(p=>Math.hypot(p.x-x,p.y-y)<Math.max(8,m.W/6)))continue;
+    pois.push({x,y,name:names[(pois.length+ (h[2]>>>3))%names.length]});
+  }
+  m.pois=pois; m.opts=o; m.ms=performance.now()-t0; m.salt=salt;
+  return m;
+}
+
+/* ---------------- palettes + painter ---------------- */
+const PALS={
+  slate:{floor:"#3b3630",floor2:"#413c35",wall:"#181520",wallHi:"#5a5364",
+    water:"#28486b",waterHi:"#3d6a94",pit:"#0b0a10",path:"#6b6046",tree:"#2f4a33",
+    prop:"#8d8577",door:"#c9a24a",grid:"rgba(255,255,255,.14)",label:"#ffd479",mark:"#ff8f8f"},
+  ink:{floor:"#e9e2cf",floor2:"#e2dac4",wall:"#2a2620",wallHi:"#6d675c",
+    water:"#b9cddb",waterHi:"#8fb0c6",pit:"#403c36",path:"#cbbd97",tree:"#7d9070",
+    prop:"#6d675c",door:"#8a6d1b",grid:"rgba(0,0,0,.18)",label:"#8a6d1b",mark:"#a33"},
+  blueprint:{floor:"#16436d",floor2:"#1a4a77",wall:"#0b2440",wallHi:"#4d84b8",
+    water:"#0e3352",waterHi:"#2f6ba0",pit:"#081c33",path:"#2a5c8c",
+    tree:"#1d5a44",prop:"#9dbbd8",door:"#ffd479",grid:"rgba(255,255,255,.2)",label:"#ffd479",mark:"#ff8f8f"},
+  mono:{floor:"#3a3a3a",floor2:"#414141",wall:"#141414",wallHi:"#6a6a6a",
+    water:"#2e2e2e",waterHi:"#4a4a4a",pit:"#0a0a0a",path:"#555",tree:"#242424",
+    prop:"#999",door:"#ccc",grid:"rgba(255,255,255,.15)",label:"#ddd",mark:"#fff"},
+};
+function paint(m,pal,withGrid,withLabels){
+  const W=m.W,H=m.H;
+  const c=document.createElement("canvas");
+  c.width=W*CP; c.height=H*CP;
+  const x=c.getContext("2d");
+  for(let cy=0;cy<H;cy++)for(let cx=0;cx<W;cx++){
+    const cell=m.cells[cy*W+cx];
+    let col=pal.floor;
+    if(hash2(cx,cy,m.salt)<0.5)col=pal.floor2;
+    if(cell===WALL)col=pal.wall;
+    else if(cell===WATER)col=hash2(cx,cy,m.salt^2)<0.3?pal.waterHi:pal.water;
+    else if(cell===PIT)col=pal.pit;
+    else if(cell===PATH)col=pal.path;
+    else if(cell===TREE)col=pal.tree;
+    x.fillStyle=col;
+    x.fillRect(cx*CP,cy*CP,CP,CP);
+    if(cell===WALL){
+      /* lit rim where wall meets walkable */
+      const nb=(dx,dy)=>{const X=cx+dx,Y=cy+dy;
+        if(X<0||Y<0||X>=W||Y>=H)return false;
+        const v=m.cells[Y*W+X];return v!==WALL;};
+      x.fillStyle=pal.wallHi;
+      if(nb(0,1))x.fillRect(cx*CP,cy*CP+CP-2,CP,2);
+      if(nb(0,-1))x.fillRect(cx*CP,cy*CP,CP,2);
+      if(nb(1,0))x.fillRect(cx*CP+CP-2,cy*CP,2,CP);
+      if(nb(-1,0))x.fillRect(cx*CP,cy*CP,2,CP);
+    }
+    if(cell===TREE){
+      x.fillStyle=pal.floor; x.fillRect(cx*CP,cy*CP,CP,CP);
+      x.fillStyle=pal.tree;
+      x.beginPath(); x.arc(cx*CP+CP/2,cy*CP+CP/2,CP*0.38,0,7); x.fill();
+      x.fillStyle=pal.wallHi;
+      x.beginPath(); x.arc(cx*CP+CP*0.42,cy*CP+CP*0.42,CP*0.12,0,7); x.fill();
+    }
+  }
+  /* doors */
+  if(m.doors)for(const d of m.doors){
+    x.fillStyle=pal.door;
+    x.fillRect(d.x*CP+2,d.y*CP+CP/2-2,CP-4,4);
+  }
+  /* props */
+  for(const p of (m.props||[])){
+    x.fillStyle=pal.prop;
+    x.fillRect(p.x*CP+CP/2-2,p.y*CP+CP/2-2,4,4);
+  }
+  /* grid */
+  if(withGrid){
+    x.strokeStyle=pal.grid; x.lineWidth=1;
+    x.beginPath();
+    for(let gx=0;gx<=W;gx++){x.moveTo(gx*CP+0.5,0);x.lineTo(gx*CP+0.5,H*CP);}
+    for(let gy=0;gy<=H;gy++){x.moveTo(0,gy*CP+0.5);x.lineTo(W*CP,gy*CP+0.5);}
+    x.stroke();
+  }
+  /* POI markers + labels */
+  for(const p of m.pois){
+    const px=p.x*CP+CP/2, py=p.y*CP+CP/2;
+    x.fillStyle=pal.mark;
+    x.beginPath(); x.arc(px,py,4,0,7); x.fill();
+    x.strokeStyle=pal.mark; x.lineWidth=1.5;
+    x.beginPath(); x.arc(px,py,7,0,7); x.stroke();
+    if(withLabels){
+      x.font="600 11px ui-sans-serif,system-ui,sans-serif";
+      const w=x.measureText(p.name).width;
+      x.fillStyle="rgba(0,0,0,.55)";
+      x.fillRect(px+10,py-8,w+8,16);
+      x.fillStyle=pal.label;
+      x.fillText(p.name,px+14,py+4);
+    }
+  }
+  return c;
+}
+
+/* ---------------- UI ---------------- */
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d");
+let dpr=Math.max(1,window.devicePixelRatio||1);
+let state=null, painted=null;
+
+const ADJ=["grey","sunken","howling","silent","gilded","broken","misty","ember",
+  "frozen","verdant","lost","crowned"];
+const NOUN=["delve","hold","march","reach","vault","fen","spire","moot",
+  "cairn","ward","deep","crossing"];
+function randomSeed(){
+  return ADJ[Math.floor(Math.random()*ADJ.length)]+"-"+
+         NOUN[Math.floor(Math.random()*NOUN.length)]+"-"+
+         Math.floor(Math.random()*9000+1000);
+}
+function readOpts(){
+  return {seed:($("seed").value.trim()||"tableforge"), family:$("family").value,
+    size:+$("size").value, density:+$("density").value, smooth:+$("smooth").value,
+    water:+$("water").value, props:+$("props").value};
+}
+function syncLabels(){
+  $("sizeV").textContent=$("size").value;
+  $("densityV").textContent=$("density").value+"%";
+  $("smoothV").textContent=$("smooth").value;
+  $("waterV").textContent=$("water").value+"%";
+  $("propsV").textContent=$("props").value+"%";
+}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1500);}
+
+function blit(){
+  const r=cv.parentElement.getBoundingClientRect();
+  const cs=getComputedStyle(document.body);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=cs.getPropertyValue("--bg")||"#14121a";
+  ctx.fillRect(0,0,r.width,r.height);
+  if(!painted)return;
+  const s=Math.min(r.width/painted.width,r.height/painted.height)*0.96;
+  ctx.imageSmoothingEnabled=false;
+  ctx.drawImage(painted,(r.width-painted.width*s)/2,(r.height-painted.height*s)/2,
+    painted.width*s,painted.height*s);
+}
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=Math.floor(r.width*dpr); cv.height=Math.floor(r.height*dpr);
+  blit();
+}
+window.addEventListener("resize",resize);
+
+function regen(){
+  const m=generate(readOpts());
+  state=m;
+  painted=paint(m,PALS[document.body.dataset.theme]||PALS.slate,
+    $("grid").checked,$("labels").checked);
+  blit();
+  $("statsLine").innerHTML=
+    `<b>${m.opts.family}</b> · ${m.W}×${m.H} cells · ${m.pois.length} POI · `+
+    `gen ${m.ms.toFixed(1)} ms`;
+  $("msTag").textContent=`gen ${m.ms.toFixed(1)} ms · ${m.W*m.H} cells`;
+  $("legend").innerHTML=m.pois.length
+    ? "<b>Points of interest:</b> "+m.pois.map(p=>p.name).join(" · ")
+    : "";
+}
+function repaint(){
+  if(!state)return;
+  painted=paint(state,PALS[document.body.dataset.theme]||PALS.slate,
+    $("grid").checked,$("labels").checked);
+  blit();
+}
+function safeName(){return String(state.opts.seed).replace(/[^\w.-]+/g,"_").slice(0,48);}
+function exportPNG(grid){
+  const scale=+$("xscale").value;
+  const src=paint(state,PALS[document.body.dataset.theme]||PALS.slate,grid,$("labels").checked);
+  const c=document.createElement("canvas");
+  c.width=src.width*scale; c.height=src.height*scale;
+  const x=c.getContext("2d"); x.imageSmoothingEnabled=false;
+  x.drawImage(src,0,0,c.width,c.height);
+  const a=document.createElement("a");
+  a.href=c.toDataURL("image/png");
+  a.download=`tableforge-${safeName()}-${state.opts.family}-${c.width}px${grid?"-grid":""}.png`;
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("PNG exported "+c.width+"×"+c.height);
+}
+function downloadText(txt,name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([txt],{type:"application/json"}));
+  a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+$("seed").value=randomSeed();
+["size","density","smooth","water","props"].forEach(id=>
+  $(id).addEventListener("input",()=>{syncLabels();regen();}));
+["family"].forEach(id=>$(id).addEventListener("change",regen));
+$("seed").addEventListener("change",regen);
+$("grid").addEventListener("change",repaint);
+$("labels").addEventListener("change",repaint);
+$("style").addEventListener("change",()=>{
+  document.body.dataset.theme=$("style").value; repaint();});
+$("gen").addEventListener("click",()=>{regen();toast("forged "+state.opts.family);});
+$("randomize").addEventListener("click",()=>{$("seed").value=randomSeed();regen();});
+$("copySeed").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText($("seed").value);toast("seed copied");}
+  catch(_){$("seed").select();document.execCommand("copy");toast("seed copied");}});
+$("png").addEventListener("click",()=>exportPNG($("grid").checked));
+$("clean").addEventListener("click",()=>exportPNG(false));
+$("json").addEventListener("click",()=>downloadText(JSON.stringify(
+  {generator:"tableforge",version:1,...readOpts()},null,2),
+  `tableforge-${safeName()}.json`));
+window.addEventListener("keydown",e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();regen();}
+  if(e.key==="r"||e.key==="R"){$("seed").value=randomSeed();regen();}
+});
+
+syncLabels();
+resize();
+regen();
+</script>
+</body>
+</html>
