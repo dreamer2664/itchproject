@@ -12,9 +12,18 @@
   "tools": [
     {
       "slug": "dungeon-map-generator",
-      "title": "Delve \u2014 Procedural Dungeon Map Generator",
+      "title": "Delve — Procedural Dungeon Map Generator",
       "tagline": "Infinite, shareable dungeons in one click. Deterministic seeds, four palettes, PNG and tile-grid export.",
-      "tags": ["dungeon-generator", "map-generator", "procedural-generation", "roguelike", "tools", "level-design", "ttrpg", "dnd"],
+      "tags": [
+        "dungeon-generator",
+        "map-generator",
+        "procedural-generation",
+        "roguelike",
+        "tools",
+        "level-design",
+        "ttrpg",
+        "dnd"
+      ],
       "kind": "html",
       "classification": "tool",
       "price_usd": 0,
@@ -26,9 +35,18 @@
     },
     {
       "slug": "texture-generator",
-      "title": "Weave \u2014 Procedural Seamless Texture Generator",
+      "title": "Weave — Procedural Seamless Texture Generator",
       "tagline": "Tileable PBR textures from a seed: albedo, normal, roughness, height. Seams are impossible -- the noise lattice is periodic.",
-      "tags": ["textures", "texture-generator", "procedural-generation", "seamless", "tileable", "pbr", "game-assets", "tools"],
+      "tags": [
+        "textures",
+        "texture-generator",
+        "procedural-generation",
+        "seamless",
+        "tileable",
+        "pbr",
+        "game-assets",
+        "tools"
+      ],
       "kind": "html",
       "classification": "tool",
       "price_usd": 0,
@@ -36,6 +54,27 @@
       "launch_mode": "free",
       "ai_disclosure": "none",
       "_niche_note": "Chosen by scout v2 on 2026-09-11: demand tag 'textures' = 2,369 results with 14 paid at $12.52 median; supply tag 'texture-generator' = 0. Strongest gold-rush gap measured."
+    },
+    {
+      "slug": "sfx-generator",
+      "title": "PEAL — Procedural Sound Effects Lab",
+      "tagline": "Seed-driven DSP: impacts, UI clicks, explosions, lasers, pickups, creature voices, creaks, whooshes, loopable ambience. Offline render, plain 16-bit WAV out, 8-variation packs zipped in-browser.",
+      "tags": [
+        "sound-effects",
+        "audio",
+        "sfx",
+        "procedural-generation",
+        "game-audio",
+        "wav",
+        "tools"
+      ],
+      "kind": "html",
+      "classification": "tool",
+      "price_usd": 0,
+      "pay_what_you_want": false,
+      "launch_mode": "free",
+      "ai_disclosure": "none",
+      "_niche_note": "Chosen 2026-09-11 per docs/INDUSTRY-DEMAND-2026-09.md: universal demand (every game needs SFX; Unity revenue guides call audio 'steady predictable income'), emptiest competition (2009-era jsfxr toys vs subscription AI clouds)."
     }
   ]
 }

@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEAL — procedural sound effects lab</title>
+<meta name="description" content="Seed-driven sound effects synthesizer. Impacts, UI clicks, explosions, lasers, pickups, creatures, creaks, whooshes and loopable ambience — rendered offline in your browser, exported as plain WAV. No uploads, no accounts, no AI.">
+<style>
+:root{
+  --bg:#14121a; --panel:#1d1a26; --panel2:#241f30; --line:#372f47;
+  --text:#e8e4f0; --dim:#9a92ab; --acc:#8fe388; --acc2:#ffd479; --warn:#ff8f8f;
+}
+body[data-theme="ink"]{ --bg:#f4f1ea; --panel:#fffdf7; --panel2:#efeadd; --line:#d8d2c2; --text:#221f18; --dim:#6d675c; --acc:#2c7a3f; --acc2:#8a6d1b; }
+body[data-theme="blueprint"]{ --bg:#0e2a4a; --panel:#12395e; --panel2:#16436d; --line:#2a5c8c; --text:#eaf4ff; --dim:#9dbbd8; --acc:#8fe388; --acc2:#ffd479; }
+body[data-theme="mono"]{ --bg:#101010; --panel:#1a1a1a; --panel2:#222; --line:#3a3a3a; --text:#eee; --dim:#999; --acc:#ccc; --acc2:#aaa; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.45 ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+header{display:flex;align-items:baseline;gap:10px;padding:10px 16px;
+  border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{margin:0;font-size:16px;letter-spacing:.06em}
+header .sub{color:var(--dim);font-size:12px}
+header .right{margin-left:auto;color:var(--dim);font-size:12px}
+main{display:flex;height:calc(100% - 45px)}
+aside{width:300px;min-width:300px;overflow-y:auto;background:var(--panel);
+  border-right:1px solid var(--line);padding:12px}
+.group{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+  padding:10px;margin-bottom:10px}
+.group h2{margin:0 0 8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+label{display:block;margin-bottom:8px}
+label .row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px}
+label .name{color:var(--text)}
+label .val{color:var(--acc);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--acc)}
+input[type=text],select{width:100%;background:var(--bg);color:var(--text);
+  border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow.full button{width:100%}
+button{background:var(--panel);color:var(--text);border:1px solid var(--line);
+  border-radius:8px;padding:7px 10px;font:inherit;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);color:#101418;border-color:transparent;font-weight:600}
+.note{font-size:11px;color:var(--dim);margin-top:6px}
+#stage{flex:1;position:relative;overflow:hidden}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hud{position:absolute;left:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap}
+.pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;
+  padding:4px 12px;font-size:12px;color:var(--dim)}
+.pill b{color:var(--text)}
+#toast{position:absolute;right:14px;bottom:14px;background:var(--panel);
+  border:1px solid var(--acc);border-radius:10px;padding:8px 14px;font-size:13px;
+  opacity:0;transform:translateY(6px);transition:.25s;pointer-events:none}
+#toast.show{opacity:1;transform:none}
+</style>
+</head>
+<body data-theme="slate">
+<header>
+  <h1>PEAL</h1>
+  <span class="sub">procedural sound effects lab — seeded DSP, offline render, plain WAV out</span>
+  <span class="right" id="msTag"></span>
+</header>
+<main>
+<aside>
+  <div class="group">
+    <h2>Seed</h2>
+    <label><input type="text" id="seed" spellcheck="false" autocomplete="off">
+      <div class="note">Same seed + same settings = same waveform, sample for sample.</div>
+    </label>
+    <div class="btnrow">
+      <button id="randomize">Random</button>
+      <button id="copySeed">Copy</button>
+      <button id="play">▶ Audition</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Sound</h2>
+    <label><div class="row"><span class="name">Family</span></div>
+      <select id="category">
+        <option value="impact">Impact / hit</option>
+        <option value="ui-click">UI click / tick</option>
+        <option value="explosion">Explosion</option>
+        <option value="laser">Laser / zap</option>
+        <option value="pickup">Pickup / coin</option>
+        <option value="creature">Creature voice</option>
+        <option value="creak">Door / creak</option>
+        <option value="whoosh">Whoosh / swing</option>
+        <option value="ambient">Ambience loop</option>
+      </select></label>
+    <label><div class="row"><span class="name">Noise colour</span></div>
+      <select id="color">
+        <option value="white">White</option>
+        <option value="pink" selected>Pink</option>
+        <option value="brown">Brown</option>
+      </select></label>
+    <label><div class="row"><span class="name">Body oscillator</span></div>
+      <select id="osc">
+        <option value="sine" selected>Sine</option>
+        <option value="triangle">Triangle</option>
+        <option value="square">Square</option>
+        <option value="saw">Saw</option>
+      </select></label>
+    <label><div class="row"><span class="name">Sample rate</span></div>
+      <select id="rate">
+        <option value="22050">22.05 kHz</option>
+        <option value="44100" selected>44.1 kHz</option>
+      </select></label>
+  </div>
+
+  <div class="group">
+    <h2>Shape</h2>
+    <label><div class="row"><span class="name">Length</span><span class="val" id="lenV"></span></div>
+      <input type="range" id="len" min="40" max="2000" step="10" value="320"></label>
+    <label><div class="row"><span class="name">Pitch</span><span class="val" id="pitchV"></span></div>
+      <input type="range" id="pitch" min="30" max="1200" step="5" value="220"></label>
+    <label><div class="row"><span class="name">Pitch drop</span><span class="val" id="dropV"></span></div>
+      <input type="range" id="drop" min="0" max="100" step="1" value="55"></label>
+    <label><div class="row"><span class="name">Noise amount</span><span class="val" id="noiseV"></span></div>
+      <input type="range" id="noise" min="0" max="100" step="1" value="45"></label>
+    <label><div class="row"><span class="name">Tone (filter)</span><span class="val" id="toneV"></span></div>
+      <input type="range" id="tone" min="100" max="8000" step="50" value="2400"></label>
+    <label><div class="row"><span class="name">Distortion</span><span class="val" id="distV"></span></div>
+      <input type="range" id="dist" min="0" max="100" step="1" value="20"></label>
+    <label><div class="row"><span class="name">Echo</span><span class="val" id="echoV"></span></div>
+      <input type="range" id="echo" min="0" max="100" step="1" value="15"></label>
+  </div>
+
+  <div class="group">
+    <h2>View</h2>
+    <label><div class="row"><span class="name">Theme</span></div>
+      <select id="style">
+        <option value="slate" selected>Slate (dark)</option>
+        <option value="ink">Ink (light)</option>
+        <option value="blueprint">Blueprint</option>
+        <option value="mono">Mono</option>
+      </select></label>
+  </div>
+
+  <div class="group">
+    <h2>Render</h2>
+    <div class="btnrow full"><button class="primary" id="gen">Render sound</button></div>
+    <div class="note">Space = render · R = random seed · P = audition.</div>
+  </div>
+
+  <div class="group">
+    <h2>Export</h2>
+    <div class="btnrow">
+      <button id="wav">WAV</button>
+      <button id="pack">Pack (8 WAV zip)</button>
+      <button id="json">Params JSON</button>
+    </div>
+    <div class="note">
+      16-bit PCM mono WAV, rendered offline by deterministic math — no codecs,
+      no uploads, no neural content. Pack = 8 seeded variations of the current
+      recipe, zipped in-browser (stored, CRC32-checked).
+    </div>
+  </div>
+</aside>
+
+<div id="stage">
+  <canvas id="cv"></canvas>
+  <div id="hud">
+    <span class="pill" id="statsLine"></span>
+    <span class="pill">waveform + peak envelope</span>
+  </div>
+  <div id="toast"></div>
+</div>
+</main>
+
+<script>
+"use strict";
+/* ------------------------------------------------------------------
+   Deterministic core. Seed + settings -> identical Float32Array on
+   every machine: plain math, no WebAudio in the render path.
+   ------------------------------------------------------------------ */
+function cyrb128(str){
+  let h1=1779033703,h2=3144134277,h3=374761393,h4=597399067;
+  for(let i=0,k;i<str.length;i++){
+    k=str.charCodeAt(i);
+    h1=h2^Math.imul(h1^k,597399067); h2=h3^Math.imul(h2^k,2869860233);
+    h3=h4^Math.imul(h3^k,951274213); h4=h1^Math.imul(h4^k,1442695041);
+  }
+  h1=Math.imul(h3^(h1>>>18),597399067); h2=Math.imul(h4^(h2>>>22),2869860233);
+  h3=Math.imul(h1^(h3>>>17),951274213); h4=Math.imul(h2^(h4>>>19),597399067);
+  return [(h1^h2^h3^h4)>>>0,(h2^h1)>>>0,(h3^h1)>>>0,(h4^h1)>>>0];
+}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;
+  let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;
+  return ((t^t>>>14)>>>0)/4294967296;};}
+const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+const TAU=Math.PI*2;
+
+/* Periodic value noise (loop-safe): lattice wraps at `period`. */
+function makeNoise(rnd, period){
+  const p=Math.max(2,period|0), g=new Float32Array(p*p);
+  for(let i=0;i<g.length;i++) g[i]=rnd()*2-1;
+  const lat=(x,y)=>g[(((y%p)+p)%p)*p+(((x%p)+p)%p)];
+  const sm=t=>t*t*(3-2*t);
+  return function(x,y){
+    const x0=Math.floor(x),y0=Math.floor(y),fx=sm(x-x0),fy=sm(y-y0);
+    const a=lat(x0,y0),b=lat(x0+1,y0),c=lat(x0,y0+1),d=lat(x0+1,y0+1);
+    return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;
+  };
+}
+
+/* Noise colours, sample-stream form (stateful filters). */
+function noiseStream(color, rnd){
+  let lp=0, b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0, last=0;
+  return function(){
+    const w=rnd()*2-1;
+    if(color==="white") return w;
+    if(color==="brown"){ last=(last+0.02*w)/1.02; return last*3.5; }
+    /* Paul Kellet pink filter */
+    b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
+    b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
+    b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
+    const pink=(b0+b1+b2+b3+b4+b5+b6+w*0.5362)*0.11;
+    b6=w*0.115926;
+    return pink;
+  };
+}
+
+/* One-pole filters */
+function makeLP(){ let y=0; return (x,a)=>{ y+=a*(x-y); return y; }; }
+function oscAt(type, ph){
+  const p=ph-Math.floor(ph);
+  if(type==="sine") return Math.sin(TAU*p);
+  if(type==="triangle") return 4*Math.abs(p-0.5)-1;
+  if(type==="square") return p<0.5?1:-1;
+  return 2*p-1; /* saw */
+}
+
+/* ------------------------------------------------------------------
+   Recipe families. Each fills buf (Float32Array) deterministically.
+   o = {seed,category,rate,lenMs,pitch,drop,noise,tone,dist,echo,color,osc}
+   ------------------------------------------------------------------ */
+function render(o){
+  const t0=performance.now();
+  const rate=o.rate|0;
+  const secs=Math.max(0.02,o.lenMs/1000);
+  const N=Math.max(64,Math.round(rate*secs));
+  const buf=new Float32Array(N);
+  const h=cyrb128(o.seed+"|"+o.category);
+  const rnd=mulberry32(h[0]);
+  const rnd2=mulberry32(h[1]);
+  const ns=noiseStream(o.color, rnd2);
+  const loop = o.category==="ambient";
+
+  /* loop-safe noise bed uses periodic lattice; one-shots use streams */
+  const bed = loop ? makeNoise(mulberry32(h[2]), 32) : null;
+
+  const nz=o.noise/100, dp=o.drop/100, ds=o.dist/100, ec=o.echo/100;
+  const f0=Math.max(20,o.pitch), cut=clamp(o.tone,80,12000);
+  const lpA=1-Math.exp(-TAU*cut/rate);
+  const lp=makeLP();
+  const hpState={y:0,px:0};
+  const hp=(x,a)=>{ hpState.y=(x-hpState.px)+(1-a)*hpState.y; hpState.px=x; return hpState.y; };
+
+  /* echo buffer */
+  const dly=Math.max(1,Math.round(rate*Math.min(0.35,secs*0.35)));
+  const fb=0.35*ec;
+  const dbuf=new Float32Array(N+dly);
+
+  /* per-family extras */
+  const r1=rnd(), r2=rnd(), r3=rnd(), r4=rnd();
+  const lfoHz = loop ? Math.max(1,Math.round((0.2+r1*0.6)*secs))/secs : 0; /* integer cycles per loop */
+  const humHz = loop ? Math.max(1,Math.round((45+r2*40)*secs))/secs : 0;
+
+  let phase=0, phase2=0;
+  for(let i=0;i<N;i++){
+    const t=i/rate, u=i/N;
+    let s=0;
+    /* amplitude envelope per family */
+    let env;
+    if(loop){ env=0.55+0.35*Math.sin(TAU*lfoHz*t); }
+    else{
+      const atk=Math.min(0.02,secs*0.08);
+      env = t<atk ? t/atk : Math.pow(1-(t-atk)/(secs-atk), 1.6+2.2*dp);
+    }
+    /* pitch envelope: base -> base*(1-drop*k) over life */
+    const pf = 1 - dp*0.9*Math.min(1,t/Math.max(secs,1e-6));
+    let f=f0*pf;
+
+    switch(o.category){
+      case "impact": {
+        const thump=oscAt(o.osc, phase)* (1-u);
+        phase+= (f*1.6*(1-0.8*u)+30)/rate;
+        const crack= ns()* (u<0.12?1-u/0.12:0);
+        s=0.75*thump+0.9*nz*crack;
+        break; }
+      case "ui-click": {
+        const tick= ns()*(u<0.25?1:0);
+        const blip= oscAt("sine", phase)*(u<0.5?1-u*2:0);
+        phase+= (f*3)/rate;
+        s=0.6*nz*tick+0.5*blip;
+        env*= (u<0.3?1:Math.pow(1-u,3));
+        break; }
+      case "explosion": {
+        const rumble=ns();
+        phase+= (f*0.5*(1-0.7*u))/rate;
+        const boom=oscAt("sine",phase)*(1-u);
+        s=0.95*nz*rumble*(0.4+0.6*(1-u)) + 0.8*boom;
+        break; }
+      case "laser": {
+        phase+= (f*4*(1-0.85*u)+200)/rate;
+        const zap=oscAt(o.osc==="sine"?"square":o.osc, phase);
+        phase2+= (f*6.13*(1-0.8*u))/rate;
+        const ring=oscAt("sine",phase2)*0.4;
+        s=0.7*zap*(1-u)+ring*(1-u)+0.25*nz*ns()*(u<0.1?1:0);
+        break; }
+      case "pickup": {
+        const step = u<0.5?1:1.5;               /* coin: two-tone rise */
+        phase+= (f*2.2*step)/rate;
+        s=0.6*oscAt("square",phase)*0.6+0.4*oscAt("sine",phase);
+        env = u<0.5 ? 1 : (u<0.55?0.2:1)*(1-Math.max(0,(u-0.55)/0.45));
+        break; }
+      case "creature": {
+        const growl=0.5+0.5*Math.sin(TAU*(3+r1*5)*t);   /* slow amplitude growl */
+        phase+= (f*(0.8+0.5*growl)*(1-0.3*u))/rate;
+        const vox=oscAt("saw",phase);
+        const breath=ns()*0.5;
+        s=(0.65*vox+0.5*nz*breath)* (0.5+0.5*growl);
+        break; }
+      case "creak": {
+        /* stick-slip: pitch jitters in steps */
+        const slip=Math.floor(t*(6+r2*8));
+        const jit=(mulberry32(h[3]^slip)()-0.5);
+        phase+= (f*(1.6+jit*0.8))/rate;
+        const body=oscAt("saw",phase);
+        s=0.55*hp(body, 1-Math.exp(-TAU*Math.max(200,cut*0.4)/rate))*0.6
+          +0.3*nz*ns()*(jit>0.25?0.6:0.1);
+        env*=0.8+0.4*Math.abs(jit);
+        break; }
+      case "whoosh": {
+        /* band-passed noise, centre sweeps up then down */
+        const sweep=Math.sin(Math.PI*u);
+        const a=1-Math.exp(-TAU*clamp(200+sweep*cut*2,100,12000)/rate);
+        s=0.9*lp(ns()*sweep, a)* (0.3+0.7*sweep);
+        env*= 0.25+0.75*sweep;
+        break; }
+      case "ambient": {
+        const bx=(i/N)*32, by=r3*32;             /* periodic bed, wraps at 32 */
+        const bedv=bed(bx,by);
+        const hum=oscAt("sine", (humHz*t));
+        const air=oscAt("sine", (humHz*2.02*t))*0.3;
+        s=0.5*nz*bedv + 0.28*hum + 0.12*air;
+        break; }
+      default: s=ns()*0.5;
+    }
+
+    /* tone filter on the mix (skip for whoosh, already filtered) */
+    if(o.category!=="whoosh") s=lp(s, lpA)*1.4;
+
+    /* distortion */
+    if(ds>0) s=Math.tanh(s*(1+ds*3))/(1+ds*0.6);
+
+    buf[i]=s*env*0.85;
+  }
+
+  /* echo pass */
+  if(ec>0){
+    const out=new Float32Array(N);
+    for(let i=0;i<N;i++){
+      let v=buf[i];
+      const past = i-dly>=0 ? out[i-dly]*fb : 0;
+      v+=past;
+      out[i]=v;
+    }
+    /* normalise below anyway */
+    buf.set(out);
+  }
+
+  /* peak-normalise to -1 dBFS */
+  let peak=0;
+  for(let i=0;i<N;i++){ const a=Math.abs(buf[i]); if(a>peak)peak=a; }
+  if(peak>1e-6){ const g=0.891/peak; for(let i=0;i<N;i++) buf[i]*=g; }
+
+  return {buf, rate, N, ms:performance.now()-t0, opts:o};
+}
+
+/* ------------------------------------------------------------------
+   WAV + ZIP writers (no libraries)
+   ------------------------------------------------------------------ */
+function wavBytes(g){
+  const N=g.N, rate=g.rate;
+  const bytes=new Uint8Array(44+N*2);
+  const dv=new DataView(bytes.buffer);
+  const wstr=(o,s)=>{for(let i=0;i<s.length;i++)bytes[o+i]=s.charCodeAt(i);};
+  wstr(0,"RIFF"); dv.setUint32(4,36+N*2,true); wstr(8,"WAVE");
+  wstr(12,"fmt "); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,1,true); dv.setUint32(24,rate,true);
+  dv.setUint32(28,rate*2,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+  wstr(36,"data"); dv.setUint32(40,N*2,true);
+  for(let i=0;i<N;i++){
+    let v=Math.round(clamp(g.buf[i],-1,1)*32767);
+    dv.setInt16(44+i*2,v,true);
+  }
+  return bytes;
+}
+const CRC_T=(()=>{const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c;}
+  return t;})();
+function crc32(b){let c=0xFFFFFFFF;
+  for(let i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);
+  return (c^0xFFFFFFFF)>>>0;}
+function zipStore(files){ /* files: [{name, bytes:Uint8Array}] */
+  const enc=new TextEncoder();
+  const chunks=[], central=[];
+  let off=0;
+  const dosTime=(10<<11)|(29<<5)|15, dosDate=((2026-1980)<<9)|(9<<5)|11;
+  for(const f of files){
+    const nb=enc.encode(f.name), cr=crc32(f.bytes);
+    const lh=new Uint8Array(30+nb.length);
+    const dv=new DataView(lh.buffer);
+    dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true); dv.setUint16(6,0,true);
+    dv.setUint16(8,0,true); dv.setUint16(10,dosTime,true); dv.setUint16(12,dosDate,true);
+    dv.setUint32(14,cr,true); dv.setUint32(18,f.bytes.length,true);
+    dv.setUint32(22,f.bytes.length,true); dv.setUint16(26,nb.length,true); dv.setUint16(28,0,true);
+    lh.set(nb,30);
+    chunks.push(lh,f.bytes);
+    central.push({nb,cr,size:f.bytes.length,off});
+    off+=lh.length+f.bytes.length;
+  }
+  const cdStart=off;
+  for(const c of central){
+    const ce=new Uint8Array(46+c.nb.length);
+    const dv=new DataView(ce.buffer);
+    dv.setUint32(0,0x02014b50,true); dv.setUint16(4,20,true); dv.setUint16(6,20,true);
+    dv.setUint16(8,0,true); dv.setUint16(10,0,true);
+    dv.setUint16(12,dosTime,true); dv.setUint16(14,dosDate,true);
+    dv.setUint32(16,c.cr,true); dv.setUint32(20,c.size,true); dv.setUint32(24,c.size,true);
+    dv.setUint16(28,c.nb.length,true);
+    ce.set(c.nb,46);
+    dv.setUint32(42,c.off,true);
+    chunks.push(ce); off+=ce.length;
+  }
+  const cdSize=off-cdStart;
+  const eo=new Uint8Array(22);
+  const dv=new DataView(eo.buffer);
+  dv.setUint32(0,0x06054b50,true);
+  dv.setUint16(8,central.length,true); dv.setUint16(10,central.length,true);
+  dv.setUint32(12,cdSize,true); dv.setUint32(16,cdStart,true);
+  chunks.push(eo);
+  let total=0; chunks.forEach(c=>total+=c.length);
+  const out=new Uint8Array(total); let p=0;
+  for(const c of chunks){ out.set(c,p); p+=c.length; }
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   UI
+   ------------------------------------------------------------------ */
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d");
+let dpr=Math.max(1,window.devicePixelRatio||1);
+let state=null;           /* last render result */
+let actx=null;
+
+const ADJ=["hollow","brass","velvet","thunder","paper","glass","ember","frost",
+  "rust","silk","stone","storm"];
+const NOUN=["knock","chime","crack","hum","burst","tick","roar","whistle",
+  "thud","ping","growl","sweep"];
+function randomSeed(){
+  return ADJ[Math.floor(Math.random()*ADJ.length)]+"-"+
+         NOUN[Math.floor(Math.random()*NOUN.length)]+"-"+
+         Math.floor(Math.random()*9000+1000);
+}
+function readOpts(){
+  return {seed:($("seed").value.trim()||"peal"),
+    category:$("category").value, color:$("color").value, osc:$("osc").value,
+    rate:+$("rate").value, lenMs:+$("len").value, pitch:+$("pitch").value,
+    drop:+$("drop").value, noise:+$("noise").value, tone:+$("tone").value,
+    dist:+$("dist").value, echo:+$("echo").value};
+}
+function syncLabels(){
+  $("lenV").textContent=(+$("len").value)+" ms";
+  $("pitchV").textContent=(+$("pitch").value)+" Hz";
+  $("dropV").textContent=(+$("drop").value)+"%";
+  $("noiseV").textContent=(+$("noise").value)+"%";
+  $("toneV").textContent=(+$("tone").value)+" Hz";
+  $("distV").textContent=(+$("dist").value)+"%";
+  $("echoV").textContent=(+$("echo").value)+"%";
+}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),1500);}
+
+function resize(){
+  const r=cv.parentElement.getBoundingClientRect();
+  cv.width=Math.floor(r.width*dpr); cv.height=Math.floor(r.height*dpr);
+  draw();
+}
+window.addEventListener("resize",resize);
+
+function draw(){
+  const r=cv.parentElement.getBoundingClientRect();
+  const cs=getComputedStyle(document.body);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle=cs.getPropertyValue("--bg")||"#14121a";
+  ctx.fillRect(0,0,r.width,r.height);
+  if(!state) return;
+  const acc=(cs.getPropertyValue("--acc")||"#8fe388").trim();
+  const acc2=(cs.getPropertyValue("--acc2")||"#ffd479").trim();
+  const dim=(cs.getPropertyValue("--dim")||"#9a92ab").trim();
+  const W=r.width, H=r.height, mid=H/2;
+  /* grid */
+  ctx.strokeStyle=dim; ctx.globalAlpha=0.25; ctx.lineWidth=1;
+  for(let gx=0; gx<=10; gx++){
+    const x=Math.round(gx*W/10)+0.5;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  /* centre line */
+  ctx.strokeStyle=dim; ctx.globalAlpha=0.6;
+  ctx.beginPath(); ctx.moveTo(0,mid+0.5); ctx.lineTo(W,mid+0.5); ctx.stroke();
+  ctx.globalAlpha=1;
+  /* min/max envelope per pixel column + rms */
+  const b=state.buf, N=state.N;
+  const cols=Math.max(1,Math.floor(W));
+  ctx.fillStyle=acc; ctx.globalAlpha=0.35;
+  ctx.beginPath();
+  const tops=new Float32Array(cols), bots=new Float32Array(cols);
+  for(let cpx=0;cpx<cols;cpx++){
+    const a=Math.floor(cpx*N/cols), z=Math.max(a+1,Math.floor((cpx+1)*N/cols));
+    let mn=1,mx=-1;
+    for(let i=a;i<z;i++){ const v=b[i]; if(v<mn)mn=v; if(v>mx)mx=v; }
+    tops[cpx]=mx; bots[cpx]=mn;
+  }
+  ctx.moveTo(0,mid-tops[0]*mid*0.92);
+  for(let cpx=1;cpx<cols;cpx++) ctx.lineTo(cpx,mid-tops[cpx]*mid*0.92);
+  for(let cpx=cols-1;cpx>=0;cpx--) ctx.lineTo(cpx,mid-bots[cpx]*mid*0.92);
+  ctx.closePath(); ctx.fill();
+  ctx.globalAlpha=1;
+  /* rms curve */
+  ctx.strokeStyle=acc2; ctx.lineWidth=1.5; ctx.beginPath();
+  for(let cpx=0;cpx<cols;cpx++){
+    const a=Math.floor(cpx*N/cols), z=Math.max(a+1,Math.floor((cpx+1)*N/cols));
+    let s2=0; for(let i=a;i<z;i++) s2+=b[i]*b[i];
+    const rms=Math.sqrt(s2/(z-a));
+    const y=mid-rms*mid*0.92;
+    if(cpx===0)ctx.moveTo(cpx,y); else ctx.lineTo(cpx,y);
+  }
+  ctx.stroke();
+  /* mirror rms */
+  ctx.globalAlpha=0.5; ctx.beginPath();
+  for(let cpx=0;cpx<cols;cpx++){
+    const a=Math.floor(cpx*N/cols), z=Math.max(a+1,Math.floor((cpx+1)*N/cols));
+    let s2=0; for(let i=a;i<z;i++) s2+=b[i]*b[i];
+    const rms=Math.sqrt(s2/(z-a));
+    const y=mid+rms*mid*0.92;
+    if(cpx===0)ctx.moveTo(cpx,y); else ctx.lineTo(cpx,y);
+  }
+  ctx.stroke(); ctx.globalAlpha=1;
+}
+
+function regen(){
+  const g=render(readOpts());
+  state=g;
+  draw();
+  const secs=(g.N/g.rate);
+  $("statsLine").innerHTML=
+    `<b>${g.opts.category}</b> · ${(secs*1000).toFixed(0)} ms · `+
+    `${(g.rate/1000).toFixed(2)} kHz · ${g.N.toLocaleString()} samples · `+
+    `render ${g.ms.toFixed(1)} ms`;
+  $("msTag").textContent=`render ${g.ms.toFixed(1)} ms · ${g.N} samples`;
+}
+
+function play(){
+  if(!state) return;
+  try{
+    if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+    if(actx.state==="suspended") actx.resume().catch(()=>{});
+    const ab=actx.createBuffer(1,state.N,state.rate);
+    ab.copyToChannel(state.buf,0);
+    const src=actx.createBufferSource(); src.buffer=ab;
+    src.connect(actx.destination); src.start();
+    toast("▶ "+state.opts.category);
+  }catch(e){ toast("audio unavailable here"); }
+}
+
+function safeName(){return String(state.opts.seed).replace(/[^\w.-]+/g,"_").slice(0,48);}
+function download(bytes,name,mime){
+  const blob=new Blob([bytes],{type:mime||"application/octet-stream"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+$("seed").value=randomSeed();
+["len","pitch","drop","noise","tone","dist","echo"].forEach(id=>
+  $(id).addEventListener("input",()=>{syncLabels();regen();}));
+["category","color","osc","rate"].forEach(id=>
+  $(id).addEventListener("change",regen));
+$("seed").addEventListener("change",regen);
+$("style").addEventListener("change",()=>{
+  document.body.dataset.theme=$("style").value; draw();});
+$("gen").addEventListener("click",()=>{regen();toast("rendered "+state.opts.category);});
+$("randomize").addEventListener("click",()=>{$("seed").value=randomSeed();regen();});
+$("copySeed").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText($("seed").value);toast("seed copied");}
+  catch(_){$("seed").select();document.execCommand("copy");toast("seed copied");}});
+$("play").addEventListener("click",play);
+$("wav").addEventListener("click",()=>{
+  download(wavBytes(state),`peal-${safeName()}-${state.opts.category}.wav`,"audio/wav");
+  toast("WAV exported");});
+$("pack").addEventListener("click",()=>{
+  const files=[];
+  for(let i=1;i<=8;i++){
+    const o=readOpts(); o.seed=o.seed+"-v"+i;
+    const g=render(o);
+    files.push({name:`peal-${safeName()}-v${i}-${o.category}.wav`,bytes:wavBytes(g)});
+  }
+  download(zipStore(files),`peal-${safeName()}-pack.zip`,"application/zip");
+  toast("8-variation pack zipped");});
+$("json").addEventListener("click",()=>{
+  download(new TextEncoder().encode(JSON.stringify(
+    {generator:"peal",version:1,...readOpts()},null,2)),
+    `peal-${safeName()}.json`,"application/json");
+  toast("params exported");});
+window.addEventListener("keydown",e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+  if(e.code==="Space"){e.preventDefault();regen();}
+  if(e.key==="r"||e.key==="R"){$("seed").value=randomSeed();regen();}
+  if(e.key==="p"||e.key==="P")play();
+});
+
+syncLabels();
+resize();
+regen();
+</script>
+</body>
+</html>

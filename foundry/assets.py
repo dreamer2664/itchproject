@@ -55,7 +55,7 @@ def _set_state(page, seed: str, style: str | None = None, labels: bool = True) -
         [seed, style, labels],
     )
     page.wait_for_timeout(150)
-    page.evaluate("fit()")
+    page.evaluate("typeof fit === 'function' && fit()")
     page.wait_for_timeout(120)
 
 
