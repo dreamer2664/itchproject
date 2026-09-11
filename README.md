@@ -94,24 +94,31 @@ python -m foundry.scout --history          # everything you've learned, ranked
 python -m foundry.scout dungeon sfx npc    # scan specific keywords
 ```
 
-`scout` fetches itch **tag pages** (allowed by robots.txt -- it never touches
-`/search`), counts results, samples the first page of products, and scores
-each niche:
+`scout` v2 fetches **two pages per keyword** (both allowed by robots.txt --
+it never touches `/search`):
+
+- **demand** = the category tag buyers browse, e.g. `tag-dungeon`
+- **supply** = the tool tag sellers use, e.g. `tag-dungeon-generator`
+
+A tag page only measures sellers, never buyers, so v1's single-page scores
+misread empty tag slugs as dead niches. v2 scores the gold-rush gap:
 
 | factor | weight | why |
 |---|---|---|
-| low total results | 40% | fewer competitors = a new page can rank |
-| fraction of page-1 items that are paid | 25% | proves buyers spend here |
-| few verified incumbents | 20% | entrenched authors are hard to displace |
-| healthy median price | 15% | price headroom |
+| supply gap (few generator tools) | 35% | an empty shelf in a busy store |
+| demand health (category size) | 30% | enough buyers browsing to matter |
+| paid ratio on the demand page | 20% | proves buyers spend here |
+| median price + weak incumbents | 15% | price headroom, displacable leaders |
 
-**Politeness is enforced in code:** one request every 8-15 s, 24 h disk cache,
-and on HTTP 429 it stops immediately instead of retrying. Run it once a day
-at most. The cache means re-runs cost zero requests.
+**Politeness is enforced in code:** one request every 15-25 s, 24 h disk
+cache, and on HTTP 429 it stops immediately instead of retrying. Default run
+is 4 keywords = 8 requests; two or three runs a day is plenty. The cache
+means finished keywords cost nothing on re-runs, so the picture accumulates.
 
-Interpretation: score ≥ 60 = promising, ≥ 45 = viable, < 30 = skip. The score
-is a *relative* ranking of your own scans; it gets smarter as sales data
-comes in.
+Interpretation: score >= 65 = PROMISING, >= 50 = VIABLE, >= 35 = CROWDED,
+below = SATURATED; demand under 50 = NO DEMAND SIGNAL. An unused supply tag
+("0 results") is reported as such -- it means nobody sells that *kind* of
+tool yet, which is the opportunity, not a warning.
 
 ---
 
