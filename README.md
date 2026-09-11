@@ -260,7 +260,7 @@ write only, short expiry, revoked when done. Never a classic token.
 
 | symptom | fix |
 |---|---|
-| `butler` not found | run `setup.ps1`, or use `.\bin\butler.exe` directly |
+| `butler` not found | run `setup.ps1` (uses the current host `broth.itch.zone`; reuses the itch app's butler if installed). Or skip butler: manual web upload is in `docs/LAUNCH-FREE.md` |
 | 429 while scouting | you're rate-limited; cached pages are kept, re-run tomorrow |
 | verify says "canvas looks blank" | your tool must render into `#cv` |
 | verify says "NOT deterministic" | remove every `Math.random` from generation |

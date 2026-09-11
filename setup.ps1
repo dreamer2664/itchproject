@@ -40,16 +40,42 @@ $butler = Join-Path $bin "butler.exe"
 if (Test-Path $butler) {
     Write-Host "  ok: butler already present at bin\butler.exe" -ForegroundColor Green
 } else {
-    Write-Host "downloading butler (official itch.io CLI)..."
-    $url = "https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default"
-    $zip = Join-Path $env:TEMP "butler.zip"
-    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-    Expand-Archive -Path $zip -DestinationPath $bin -Force
-    Remove-Item $zip -Force
-    if (Test-Path $butler) {
-        Write-Host "  ok: bin\butler.exe" -ForegroundColor Green
-    } else {
-        Write-Host "butler download failed. Get it manually from https://itch.io/docs/butler/" -ForegroundColor Yellow
+    # broth.itch.zone is the current official fixed URL (itch.io docs, 2026).
+    # broth.itch.ovh is the deprecated hostname; kept only as a fallback.
+    $urls = @(
+        "https://broth.itch.zone/butler/windows-amd64/LATEST/archive/default",
+        "https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default"
+    )
+    # The itch desktop app also ships a kept-up-to-date butler; reuse it if present.
+    $appButler = Join-Path $env:LOCALAPPDATA "itch\bin\butler.exe"
+
+    $done = $false
+    if (Test-Path $appButler) {
+        Copy-Item $appButler $butler
+        Write-Host "  ok: copied bundled butler from the itch app" -ForegroundColor Green
+        $done = $true
+    }
+    if (-not $done) {
+        foreach ($url in $urls) {
+            try {
+                Write-Host "downloading butler from $url ..."
+                $zip = Join-Path $env:TEMP "butler.zip"
+                Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+                Expand-Archive -Path $zip -DestinationPath $bin -Force
+                Remove-Item $zip -Force
+                if (Test-Path $butler) { Write-Host "  ok: bin\butler.exe" -ForegroundColor Green; $done = $true; break }
+            } catch {
+                Write-Host "  that mirror failed: $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
+    }
+    if (-not $done) {
+        # Not fatal: publish.py can fall back to manual web upload, and you can
+        # drop a butler.exe into .\bin yourself at any time.
+        Write-Host "butler download failed. This is NOT fatal." -ForegroundColor Yellow
+        Write-Host "  Options: install the official itch app (https://itch.io/app) and re-run,"
+        Write-Host "  or put any butler.exe at .\bin\butler.exe,"
+        Write-Host "  or skip butler entirely and use the manual web upload in docs/LAUNCH-FREE.md."
     }
 }
 

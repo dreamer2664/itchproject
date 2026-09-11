@@ -209,11 +209,25 @@ def page_instructions(cfg: dict, tool: dict) -> None:
 def push(cfg: dict, tool: dict, channel: str) -> int:
     butler = butler_path()
     if not butler:
-        sys.exit(
-            "butler not found.\n"
-            "  Windows: run  powershell -ExecutionPolicy Bypass -File setup.ps1\n"
-            "  or download from https://itch.io/docs/butler/ and put it on PATH."
-        )
+        print("""
+butler not found -- falling back instructions (manual web upload):
+
+  butler is the convenient path, not the only one. For an HTML project you
+  can upload through the page editor instead:
+
+   1. Open your project's edit page on itch.io (Dashboard -> the project).
+   2. In the Uploads section, 'Add file' -> build/<slug>/<slug>.zip
+   3. Set its kind to HTML and tick 'This file will be played in the browser'.
+   4. Save. The playable build updates immediately.
+
+  To get butler later (recommended for versioned updates and patching):
+   - run:  powershell -ExecutionPolicy Bypass -File setup.ps1
+     (it now uses the current official host, broth.itch.zone)
+   - or install the official itch app (https://itch.io/app) and re-run
+     setup.ps1: it will reuse the butler bundled with the app
+   - or drop any butler.exe into .\\bin\\ yourself
+""")
+        return 1
     uname = cfg["itch"].get("username")
     if not uname:
         sys.exit('Set your itch username in config.json:  "itch": {"username": "..."}')
