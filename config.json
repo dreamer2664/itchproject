@@ -1,4 +1,9 @@
 {
+  "launch": {
+    "auto_publish": false,
+    "max_auto_publish_per_day": 2,
+    "_note": "auto_publish=true makes launch.py click Save with no human review. Opt-in only. Hard-capped per day and logged in data/foundry.db. itch.io forbids automated mass page production; one distinct tool per launch, human-reviewed by default, is what keeps this account healthy."
+  },
   "itch": {
     "username": "",
     "api_key_env": "BUTLER_API_KEY",

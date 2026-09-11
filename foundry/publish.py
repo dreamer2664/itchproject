@@ -161,6 +161,29 @@ itch.io's guidelines describe as NOT requiring an AI tag.
 """
     (out / "COPY.md").write_text(copy, encoding="utf-8")
 
+    # machine-readable copy for foundry.launch (the assisted publisher)
+    copy_json = {
+        "slug": tool["slug"],
+        "title": tool["title"],
+        "tagline": tool["tagline"],
+        "tags": tool["tags"],
+        "description": desc,
+        "kind": tool.get("classification", "tool"),
+        "in_browser": True,
+        "pricing": "none" if tool.get("launch_mode") == "free" else (
+            "pwyw" if tool.get("pay_what_you_want") else "fixed"),
+        "price_usd": tool.get("price_usd", 0),
+        "ai_disclosure": "no",
+        "files": {
+            "zip": f"{tool['slug']}.zip",
+            "cover_gif": "cover.gif",
+            "cover_png": "cover.png",
+            "screenshots": [f"gallery-{p}.png"
+                            for p in ("ink", "blueprint", "slate", "mono")],
+        },
+    }
+    (out / "copy.json").write_text(json.dumps(copy_json, indent=2), encoding="utf-8")
+
     print(f"packaged -> {out.relative_to(ROOT)}/")
     print(f"  index.html        ({(out/'index.html').stat().st_size:,} bytes)")
     print(f"  {tool['slug']}.zip  ({zpath.stat().st_size:,} bytes)")

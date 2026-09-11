@@ -162,6 +162,30 @@ re-running this line -- versions and patches are handled by butler.
 
 ---
 
+## Part 5b -- one-command launch (optional, after calibration)
+
+`python -m foundry.launch <slug>` chains verify -> package -> assets ->
+browser: it opens a headed Chromium with a persistent profile (you log in to
+itch.io **once**, ever), fills every field of the new-project form from
+`copy.json`, uploads cover, screenshots and the zip -- then **stops and lets
+you click Save**.
+
+First run is calibration: itch's editor is behind login and has no public
+API, so the script dumps the form's field inventory to
+`data/editor_capture/editor_fields.json` and submits nothing. That file gets
+turned into `editor_selectors.json` (committed to the repo), and from then on
+filling works.
+
+Fully unattended publishing exists but is **opt-in**: set
+`launch.auto_publish` to `true` in `config.json`. It is hard-capped at
+`max_auto_publish_per_day` (default 2) and every launch is logged in
+`data/foundry.db`. Rationale: itch.io's guidelines forbid automated systems
+mass-producing product pages, and the human click is the quality gate that
+stops a bad generation from going public under your name. Default stays
+assisted; flip it only once you've reviewed several assisted launches.
+
+---
+
 ## Part 6 -- watch and iterate
 
 - Sales and views: https://itch.io/dashboard/analytics
