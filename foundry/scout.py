@@ -381,9 +381,14 @@ def db() -> sqlite3.Connection:
 
 
 def save(report: NicheReport) -> None:
+    cols = ("keyword, category, url, fetched_at, total_results, "
+            "priced_count, free_count, median_price, min_price, max_price, "
+            "on_sale_count, verified_count, browser_playable_count, "
+            "opportunity_score, verdict, raw_json")
+    marks = ",".join("?" * len(cols.split(", ")))
     with db() as c:
-        c.execute("""
-        INSERT OR REPLACE INTO niches VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        c.execute(f"""
+        INSERT OR REPLACE INTO niches ({cols}) VALUES ({marks})
         """, (
             report.keyword, report.category, report.url, report.fetched_at,
             report.total_results, report.priced_count, report.free_count,
