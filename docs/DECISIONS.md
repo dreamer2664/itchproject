@@ -96,3 +96,20 @@ reputable exchanges are 18+, and non-KYC services are scams or illegal.
 - Scrape `/search` (disallowed by robots.txt) or exceed polite rate limits.
 - Put generative-AI output into products (breaks the platform's trust and
   the community's).
+
+## 2026-09-11 — launch.py retired; manual page birth is the protocol
+
+- Root cause found: itch.io's bot-check (captcha) defeats the Playwright
+  browser at step 4/5 BROWSER even with a human solving it in front of the
+  window. It also explains the empty `editor_fields.json` from the calibration
+  run: the capture snapshot was a challenge page, not the editor form.
+- Decision: **page birth = human in an ordinary browser** (~6 minutes: paste
+  the copy kit, drag cover + screenshots + zip, set free/no-payments, click
+  Save). A normal browser passes the captcha because it IS normal browsing.
+  Updates forever after = `butler push` (API key, no browser).
+- `foundry/launch.py` stays in the repo as a documented experiment but is no
+  longer maintained or part of the pipeline. `editor_selectors.json` is no
+  longer needed by anything.
+- This is also the most ToS-conservative design we have had: zero automation
+  touches page creation, so the mass-page-spam rule can never be tripped.
+- Vertical selection moved to evidence: see docs/INDUSTRY-DEMAND-2026-09.md.
