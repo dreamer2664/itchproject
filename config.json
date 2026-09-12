@@ -97,6 +97,30 @@
       "launch_mode": "free",
       "ai_disclosure": "none",
       "_niche_note": "Vertical #4 per docs/INDUSTRY-DEMAND-2026-09.md: tabletop = itch's 2nd most active community (18.3k projects, +135/wk); paid-tool willingness proven (Arkenforge, Dungeondraft); generator seat on the free shelf nearly empty."
+    },
+    {
+      "slug": "grimforge",
+      "title": "GRIMFORGE — Goblin Factory Tycoon",
+      "tagline": "A deep factory-automation tycoon in one file: dig a seeded cave, lay belts, run miners and smelters, forge gears, blades and amulets, fulfil timed trade contracts, feed and house your goblin crew.",
+      "tags": [
+        "factory",
+        "automation",
+        "tycoon",
+        "management",
+        "base-building",
+        "strategy",
+        "procedural-generation",
+        "singleplayer",
+        "html5",
+        "free"
+      ],
+      "kind": "html",
+      "classification": "game",
+      "price_usd": 0,
+      "pay_what_you_want": false,
+      "launch_mode": "free",
+      "ai_disclosure": "none",
+      "_niche_note": "Flagship game per docs/GAME-DEMAND-2026-09.md: factory/automation = highest-median indie genre ($200k-$500k+ per 100+ reviews), colony sim/management second; sim&sandbox fastest-growing block at 16.78% CAGR; browser management sims thrive on itch (7,464 management-tagged games)."
     }
   ]
 }
