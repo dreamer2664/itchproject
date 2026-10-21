@@ -40,12 +40,22 @@ $butler = Join-Path $bin "butler.exe"
 if (Test-Path $butler) {
     Write-Host "  ok: butler already present at bin\butler.exe" -ForegroundColor Green
 } else {
+    # PowerShell 5.1 (the Windows default) may negotiate TLS 1.0/1.1, which
+    # Cloudflare-hosted mirrors reject. Force TLS 1.2 before any download.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
     # broth.itch.zone is the current official fixed URL (itch.io docs, 2026).
-    # broth.itch.ovh is the deprecated hostname; kept only as a fallback.
+    # GitHub releases are the resilient fallback (itch.ovh is already dead);
+    # broth.itch.ovh is kept only as a last resort.
     $urls = @(
-        "https://broth.itch.zone/butler/windows-amd64/LATEST/archive/default",
-        "https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default"
+        "https://broth.itch.zone/butler/windows-amd64/LATEST/archive/default"
     )
+    try {
+        $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/itchio/butler/releases/latest" -UseBasicParsing
+        $asset = $rel.assets | Where-Object { $_.name -eq "butler-windows-amd64.zip" } | Select-Object -First 1
+        if ($asset) { $urls += $asset.browser_download_url }
+    } catch { }
+    $urls += "https://github.com/itchio/butler/releases/download/v15.32.0/butler-windows-amd64.zip"
+    $urls += "https://broth.itch.ovh/butler/windows-amd64/LATEST/archive/default"
     # The itch desktop app also ships a kept-up-to-date butler; reuse it if present.
     $appButler = Join-Path $env:LOCALAPPDATA "itch\bin\butler.exe"
 
@@ -63,7 +73,19 @@ if (Test-Path $butler) {
                 Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
                 Expand-Archive -Path $zip -DestinationPath $bin -Force
                 Remove-Item $zip -Force
-                if (Test-Path $butler) { Write-Host "  ok: bin\butler.exe" -ForegroundColor Green; $done = $true; break }
+                # GitHub release zips nest everything under windows-amd64\
+                # (butler.exe plus two required DLLs); broth zips are flat.
+                # Handle both layouts.
+                $nested = Join-Path $bin "windows-amd64"
+                if ((Test-Path (Join-Path $nested "butler.exe")) -and -not (Test-Path $butler)) {
+                    Move-Item -Path (Join-Path $nested "*") -Destination $bin -Force
+                    Remove-Item $nested -Recurse -Force
+                }
+                if (Test-Path $butler) {
+                    Write-Host "  ok: bin\butler.exe" -ForegroundColor Green
+                    & $butler -V
+                    $done = $true; break
+                }
             } catch {
                 Write-Host "  that mirror failed: $($_.Exception.Message)" -ForegroundColor Yellow
             }
