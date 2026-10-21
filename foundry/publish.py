@@ -262,7 +262,16 @@ butler not found -- falling back instructions (manual web upload):
                  '"itch": {"username": "..."} in config.json.')
 
     key_env = cfg["itch"].get("api_key_env", "BUTLER_API_KEY")
-    if not os.environ.get(key_env):
+    key_val = (os.environ.get(key_env) or "").strip()
+    if key_val in {"...", "paste-your-key-here", "your-key-here", "your-api-key"}:
+        sys.exit(
+            f"{key_env} is still the placeholder from the example, not a real key.\n"
+            f"  Get one:  https://itch.io/user/settings/api-keys\n"
+            f"  Then, in THIS terminal:\n"
+            f'      $env:{key_env}="the-long-string-it-gives-you"\n'
+            f"  (Or unset it entirely and butler will open a browser login.)"
+        )
+    if not key_val:
         print(f"WARNING: {key_env} is not set. butler will open a browser to log in.",
               file=sys.stderr)
         print(f"  (Get a key at https://itch.io/user/settings/api-keys and run:",
