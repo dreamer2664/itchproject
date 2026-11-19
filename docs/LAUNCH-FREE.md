@@ -79,6 +79,16 @@ You should now have, in `build/dungeon-map-generator/`:
 
 ## Ship the build with butler
 
+**Preflight for the automated path** (the canonical click-by-click protocol
+is `docs/MANUAL-PUBLISH.md`; this is the checklist version):
+
+- [ ] itch.io account exists (13+, email only)
+- [ ] the project page exists and is Public (steps above / MANUAL-PUBLISH)
+- [ ] username set: `config.json` → `"itch": {"username": ...}` or `$env:ITCH_USER`
+- [ ] the env var holds the **real** key, not the placeholder `"..."`
+- [ ] `bin\butler.exe` exists — *optional*: if it's missing, `push` prints
+      manual web-upload instructions instead of failing silently
+
 ```powershell
 $env:BUTLER_API_KEY="your-key-from-itch-io-user-settings-api-keys"
 python -m foundry.publish push dungeon-map-generator

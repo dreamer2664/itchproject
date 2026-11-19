@@ -292,6 +292,9 @@ write only, short expiry, revoked when done. Never a classic token.
 | symptom | fix |
 |---|---|
 | `butler` not found | run `setup.ps1` (uses the current host `broth.itch.zone`; reuses the itch app's butler if installed). Or skip butler: manual web upload is in `docs/LAUNCH-FREE.md` |
+| butler download: "cannot resolve remote name" | the old `broth.itch.ovh` host is dead. `setup.ps1` tries `broth.itch.zone`, then GitHub releases, then the itch app's bundled butler. If every source fails, use manual web upload (`docs/MANUAL-PUBLISH.md`) |
+| push: "still the placeholder ... not a real key" | you set the literal `"..."`. Paste the real ~40-char key from https://itch.io/user/settings/api-keys into `$env:BUTLER_API_KEY` in *this* terminal (or unset it and let butler open a browser login). Never paste it into chat or git |
+| push: "Need your itch username" | set `"itch": {"username": "your-itch-username"}` in `config.json`, or `$env:ITCH_USER="..."` (the part before `.itch.io`) |
 | 429 while scouting | you're rate-limited; cached pages are kept, re-run tomorrow |
 | verify says "canvas looks blank" | your tool must render into `#cv` |
 | verify says "NOT deterministic" | remove every `Math.random` from generation |

@@ -197,7 +197,18 @@ def verify(tool_dir: Path, shots_dir: Path) -> bool:
 
 
 def main(argv: list[str]) -> int:
-    targets = argv[1:] or ["tools/dungeon-map-generator"]
+    if argv[1:]:
+        targets = argv[1:]
+    else:
+        # Default: the whole catalogue from config.json, so a bare
+        # `python -m foundry.verify` gates everything that could ship.
+        import json
+        try:
+            cfg = json.loads((ROOT / "config.json").read_text(encoding="utf-8"))
+            targets = [f"tools/{t['slug']}" for t in cfg.get("tools", [])]
+        except Exception:  # noqa: BLE001
+            targets = []
+        targets = targets or ["tools/dungeon-map-generator"]
     shots = ROOT / "data" / "screenshots"
     all_ok = True
     for t in targets:
